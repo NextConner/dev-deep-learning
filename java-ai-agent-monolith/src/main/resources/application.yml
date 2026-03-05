@@ -56,3 +56,11 @@ app:
   vector:
     enabled: ${VECTOR_ENABLED:true}
     dimension: 1536  # for text-embedding-v3
+
+# application.yml
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: sk-b5923d391e774204b6cbc85ee560e397
+      model-name: deepseek-chat
+      base-url: https://api.deepseek.com

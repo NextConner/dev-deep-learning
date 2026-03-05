@@ -6,3 +6,7 @@
 /java-ai-agent-monolith/.vscode/
 /java-ai-agent-monolith/target/
 /.idea/
+/learn-from-claude/.mvn/
+/learn-with-claude/.mvn/
+/learn-with-claude/target/
+/learn-from-claude.iml

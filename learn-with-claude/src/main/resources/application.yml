@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: learn-from-claude
+  datasource:
+    url: jdbc:postgresql://192.168.20.129:5432/ragdb
+    username: pgsql
+    password: 123456
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+
+# application.yml
+langchain4j:
+  openai:              # ← 不是 open-ai
+    chat-model:
+      base-url: https://api.deepseek.com
+      api-key: sk-b5923d391e774204b6cbc85ee560e397
+      model-name: deepseek-chat
+
