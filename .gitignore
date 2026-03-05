@@ -1,3 +1,7 @@
 /java-ai-agent-monolith/.classpath
 /java-ai-agent-monolith/.factorypath
 /java-ai-agent-monolith/.project
+/java-ai-agent-monolith/.idea/
+/java-ai-agent-monolith/.settings/
+/java-ai-agent-monolith/.vscode/
+/java-ai-agent-monolith/target/
