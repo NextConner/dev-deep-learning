@@ -13,11 +13,13 @@ spring:
       ddl-auto: update
 
 
+DEEPSEEK_API_KEY: sk-5a95b401ad1d437b9530fe2dffd479e1
+
 # application.yml
 langchain4j:
   openai:              # ← 不是 open-ai
     chat-model:
       base-url: https://api.deepseek.com
-      api-key: sk-b5923d391e774204b6cbc85ee560e397
+      api-key: ${DEEPSEEK_API_KEY:sk-5a95b401ad1d437b9530fe2dffd479e1}
       model-name: deepseek-chat
 
