@@ -9,6 +9,8 @@ import dev.langchain4j.store.embedding.EmbeddingMatch;
 import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
 import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -17,6 +19,9 @@ import java.util.Map;
 
 @Service
 public class HybridSearchService {
+
+    private static final Logger log = LoggerFactory.getLogger(HybridSearchService.class);
+
 
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> embeddingStore;
@@ -36,7 +41,8 @@ public class HybridSearchService {
      *  混合检索：向量检索 + 关键词检索，结构融合返回
      */
     public List<String> hybridSearch(String query, int topK){
-
+        long start = System.currentTimeMillis();
+        log.info("🔍 混合检索开始，query: {}", query);
         //第一路：向量检索
         Embedding queryEmbedding = embeddingModel .embed(query).content();
         EmbeddingSearchRequest searchRequest = EmbeddingSearchRequest.builder()
@@ -67,6 +73,8 @@ public class HybridSearchService {
             double rrfScore = 1.0 / (60 + i + 1);
             scoreMap.merge(content, rrfScore, Double::sum);
         }
+        long elapsed = System.currentTimeMillis() - start;
+        log.info("✅ 混合检索完成，命中 {} 条，耗时 {} ms", 0, elapsed);
 
         //按分数排序，取 topK
         return scoreMap.entrySet().stream()

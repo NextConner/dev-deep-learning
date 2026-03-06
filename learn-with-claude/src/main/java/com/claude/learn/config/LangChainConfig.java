@@ -1,21 +1,27 @@
 package com.claude.learn.config;
 
+import com.claude.learn.agent.AgentTools;
+import com.claude.learn.agent.PolicyAgent;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import dev.langchain4j.service.AiServices;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.pgvector.PgVectorEmbeddingStore;
+import org.aspectj.weaver.loadtime.Agent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 
 import javax.sql.DataSource;
 
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class LangChainConfig {
 
     @Value("${DEEPSEEK_API_KEY}")
@@ -24,14 +30,6 @@ public class LangChainConfig {
     @Value("${EMBEDDING_API_KEY}")
     private String embeddingApiKey;
 
-//    @Bean
-//    public ChatLanguageModel chatLanguageModel() {
-//        return OpenAiChatModel.builder()
-//                .baseUrl("https://api.deepseek.com")
-//                .apiKey("apiKey")
-//                .modelName("deepseek-chat")
-//                .build();
-//    }
 
 
     @Bean
@@ -66,6 +64,28 @@ public class LangChainConfig {
     @Bean
     public ChatMemory chatMemory() {
         return MessageWindowChatMemory.withMaxMessages(10); // 保留最近10条对话
+    }
+
+    /**
+     * 注入自定义 agent
+     */
+    @Bean
+    public PolicyAgent policyAgent(ChatLanguageModel chatLanguageModel, AgentTools agentTools, ChatMemory chatMemory) {
+        return AiServices.builder(PolicyAgent.class)
+                .chatLanguageModel(chatLanguageModel)
+                .streamingChatLanguageModel(streamingChatLanguageModel())
+                .tools(agentTools)
+                .chatMemory(chatMemory)
+                .build();
+    }
+
+    @Bean
+    public OpenAiStreamingChatModel streamingChatLanguageModel(){
+                return OpenAiStreamingChatModel.builder()
+                .baseUrl("https://api.deepseek.com")
+                .apiKey(apiKey)
+                .modelName("deepseek-chat")
+                .build();
     }
 
 

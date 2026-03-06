@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>企业智能助手</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        #output { border: 1px solid #ddd; padding: 16px; min-height: 200px;
+                   border-radius: 8px; white-space: pre-wrap; line-height: 1.8; }
+        #input { width: 80%; padding: 8px; font-size: 14px; }
+        button { padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<h2>企业智能助手</h2>
+<div id="output">回答将显示在这里...</div>
+<br>
+<input id="input" type="text" placeholder="请输入问题..." />
+<button onclick="ask()">发送</button>
+
+<script>
+    function ask() {
+      const message = document.getElementById('input').value;
+      const output = document.getElementById('output');
+      output.textContent = "";
+
+      let buffer = "";
+
+      const evtSource = new EventSource(
+        `/api/chat/stream?message=${encodeURIComponent(message)}`
+      );
+
+      evtSource.onmessage = (event) => {
+        buffer += event.data;
+
+        // 按句子断行输出
+        const breakChars = ["。", "！", "？", "；", "\n"];
+        let shouldFlush = breakChars.some(c => buffer.endsWith(c));
+
+        if (shouldFlush) {
+          output.textContent += buffer + "\n";
+          buffer = "";
+        }
+      };
+
+      evtSource.onerror = () => {
+        if (buffer) {
+          output.textContent += buffer; // 输出剩余内容
+        }
+        evtSource.close();
+      };
+    }
+</script>
+</body>
+</html>

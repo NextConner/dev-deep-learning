@@ -17,13 +17,24 @@
   <name>learn-with-claude Maven Webapp</name>
   <url>http://maven.apache.org</url>
 
+  <!-- 建议用 properties 统一管理版本 -->
+  <properties>
+    <langchain4j.version>0.36.2</langchain4j.version>
+  </properties>
+
   <dependencies>
+
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-agentic</artifactId>
+<!--      <version>${langchain4j.version}</version>-->
+    </dependency>
 
     <!-- PDF 解析 -->
     <dependency>
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j-document-parser-apache-pdfbox</artifactId>
-      <version>0.36.2</version>
+      <version>${langchain4j.version}</version>
     </dependency>
 
     <!-- Word 文档解析 -->
@@ -88,6 +99,12 @@
       <artifactId>langchain4j-open-ai-spring-boot-starter</artifactId>
       <version>0.36.2</version>
     </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-aop</artifactId>
+    </dependency>
+
   </dependencies>
 
   <build>
