@@ -1,6 +1,6 @@
 package com.claude.learn.service;
 
-import org.springframework.stereotype.Service;
+import com.claude.learn.config.RagProperties;
 import com.claude.learn.domain.DocumentSegment;
 import com.claude.learn.repository.DocumentSegmentRepository;
 import dev.langchain4j.data.document.Document;
@@ -21,55 +21,54 @@ import java.util.List;
 @Service
 public class DocumentIngestService {
 
-
     private static final Logger log = LoggerFactory.getLogger(DocumentIngestService.class);
 
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> embeddingStore;
     private final DocumentSegmentRepository repository;
+    private final RagProperties ragProperties;
 
     public DocumentIngestService(
             EmbeddingModel embeddingModel,
             EmbeddingStore<TextSegment> embeddingStore,
-            DocumentSegmentRepository repository) {
+            DocumentSegmentRepository repository,
+            RagProperties ragProperties) {
         this.embeddingModel = embeddingModel;
         this.embeddingStore = embeddingStore;
         this.repository = repository;
+        this.ragProperties = ragProperties;
     }
 
-    //解析文档
-    public void ingest(byte[] fileBytes,String filename){
+    public void ingest(byte[] fileBytes, String filename) {
 
-        log.info("📄 开始处理文档：{}", filename);
+        log.info("Start ingest document: {}", filename);
 
-        //区分类型
-        Document document ;
-        try(var inputStream = new ByteArrayInputStream(fileBytes)) {
+        Document document;
+        try (var inputStream = new ByteArrayInputStream(fileBytes)) {
             if (filename.endsWith(".pdf")) {
                 document = new ApachePdfBoxDocumentParser().parse(inputStream);
             } else if (filename.endsWith(".docx")) {
                 document = new ApachePoiDocumentParser().parse(inputStream);
             } else {
-                throw new IllegalArgumentException("不支持的文件类型");
+                throw new IllegalArgumentException("Unsupported file type");
             }
         } catch (Exception e) {
-            log.error("❌ 解析文档失败：", e);
-            throw new RuntimeException("解析文档失败: " + e.getMessage());
+            log.error("Parse document failed", e);
+            throw new RuntimeException("Parse document failed: " + e.getMessage());
         }
 
-        //分块
-        var splitter = new DocumentBySentenceSplitter(300,30);
+        var splitter = new DocumentBySentenceSplitter(
+                ragProperties.getChunk().getMaxSegmentSize(),
+                ragProperties.getChunk().getMaxOverlapSize()
+        );
         List<TextSegment> segments = splitter.split(document);
-        log.info("✂️ 文档分割成 {} 个片段", segments.size());
+        log.info("Document split into {} segments", segments.size());
 
-        //写入向量库和全文检索
         for (TextSegment segment : segments) {
             Embedding embedding = embeddingModel.embed(segment).content();
-            embeddingStore.add(embedding,segment);
-            repository.save(new DocumentSegment(segment.text(),filename));
+            embeddingStore.add(embedding, segment);
+            repository.save(new DocumentSegment(segment.text(), filename));
         }
-        log.info("✅ 文档处理完成:{}，已存储 {} 个片段",filename ,segments.size());
+        log.info("Document ingest completed: {}, stored {} segments", filename, segments.size());
     }
-
-
 }
