@@ -30,6 +30,12 @@ rag:
     max-segment-size: 300
     max-overlap-size: 30
 
+agent:
+  runtime:
+    max-steps: 3
+    step-timeout-ms: 15000
+    retry-times: 1
+
 # application.yml
 #langchain4j:
 #  openai:              # ← 不是 open-ai

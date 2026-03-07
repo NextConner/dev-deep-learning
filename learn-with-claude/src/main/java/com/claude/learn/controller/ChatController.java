@@ -1,14 +1,21 @@
 package com.claude.learn.controller;
 
 import com.claude.learn.agent.PolicyAgent;
-import com.claude.learn.config.UserContext;
+import com.claude.learn.agent.runtime.AgentRun;
+import com.claude.learn.agent.runtime.AgentRunStatus;
+import com.claude.learn.service.AgentOrchestratorService;
 import com.claude.learn.service.PromptService;
 import com.claude.learn.service.TokenMonitorService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -20,24 +27,27 @@ import java.util.concurrent.Executors;
 @RequestMapping("/api")
 public class ChatController {
 
+    private static final String DEFAULT_PROMPT = """
+            ÄãÊÇÒ»¸öÆóÒµÄÚ²¿ÖÇÄÜÖúÊÖ£¬ÄãÓĞÒÔÏÂ¹¤¾ß¿ÉÒÔÊ¹ÓÃ£º
+            1. searchPolicy£º²éÑ¯¹«Ë¾ÄÚ²¿Õş²ßÎÄµµ
+            2. getWeather£º²éÑ¯³ÇÊĞÌìÆø
+            Çë¸ù¾İÓÃ»§ÎÊÌâ×ÔÖ÷¾ö¶¨µ÷ÓÃÄÄĞ©¹¤¾ß£¬×ÛºÏ½á¹û¸ø³öÍêÕû»Ø´ğ¡£
+            """;
 
     private final PolicyAgent policyAgent;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final TokenMonitorService tokenMonitorService;
     private final PromptService promptService;
+    private final AgentOrchestratorService agentOrchestratorService;
 
-    private static final String DEFAULT_PROMPT = """
-            ä½ æ˜¯ä¸€ä¸ªä¼ä¸šå†…éƒ¨æ™ºèƒ½åŠ©æ‰‹ï¼Œä½ æœ‰ä»¥ä¸‹å·¥å…·å¯ä»¥ä½¿ç”¨ï¼š
-            1. searchPolicyï¼šæŸ¥è¯¢å…¬å¸å†…éƒ¨æ”¿ç­–æ–‡æ¡£
-            2. getWeatherï¼šæŸ¥è¯¢åŸå¸‚å¤©æ°”
-            è¯·æ ¹æ®ç”¨æˆ·é—®é¢˜è‡ªä¸»å†³å®šè°ƒç”¨å“ªäº›å·¥å…·ï¼Œç»¼åˆç»“æœç»™å‡ºå®Œæ•´å›ç­”ã€‚
-            """;
-
-
-    public ChatController(PolicyAgent policyAgent,TokenMonitorService tokenMonitorService, PromptService promptService) {
-        this.promptService = promptService;
-        this.tokenMonitorService = tokenMonitorService;
+    public ChatController(PolicyAgent policyAgent,
+                          TokenMonitorService tokenMonitorService,
+                          PromptService promptService,
+                          AgentOrchestratorService agentOrchestratorService) {
         this.policyAgent = policyAgent;
+        this.tokenMonitorService = tokenMonitorService;
+        this.promptService = promptService;
+        this.agentOrchestratorService = agentOrchestratorService;
     }
 
     @GetMapping("/usage")
@@ -50,34 +60,38 @@ public class ChatController {
     }
 
     @PostMapping("/chat")
-    public ResponseEntity chat(@RequestBody ChatRequest request) {
+    public ResponseEntity<?> chat(@RequestBody ChatRequest request) {
 
         String username = getCurrentUsername();
 
-        // é…é¢æ£€æŸ¥
         if (tokenMonitorService.isExceeded(username)) {
             return ResponseEntity.status(429)
-                    .body(Map.of("error", "ä»Šæ—¥ Token é…é¢å·²ç”¨å®Œï¼Œè¯·æ˜å¤©å†è¯•"));
+                    .body(Map.of("error", "½ñÈÕ Token Åä¶îÒÑÓÃÍê£¬ÇëÃ÷ÌìÔÙÊÔ"));
         }
-        return ResponseEntity.ok(policyAgent.chat(request.message(),promptService.getPrompt("policy_agent", DEFAULT_PROMPT)));
-    }
 
-    public record ChatRequest(String message) {}
+        String systemPrompt = promptService.getPrompt("policy_agent", DEFAULT_PROMPT);
+        AgentRun run = agentOrchestratorService.run(username, request.message(), systemPrompt);
 
-    private String getCurrentUsername() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null ? auth.getName() : "anonymous";
+        if (run.getStatus() == AgentRunStatus.SUCCESS) {
+            return ResponseEntity.ok(run.getFinalAnswer());
+        }
+
+        return ResponseEntity.status(500)
+                .body(Map.of(
+                        "error", "Agent execution failed",
+                        "runId", run.getRunId(),
+                        "steps", run.getSteps().size()
+                ));
     }
 
     @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@RequestParam String message){
+    public SseEmitter stream(@RequestParam String message) {
 
         String username = getCurrentUsername();
-        // é…é¢æ£€æŸ¥
         if (tokenMonitorService.isExceeded(username)) {
             SseEmitter emitter = new SseEmitter();
             try {
-                emitter.send("ä»Šæ—¥ Token é…é¢å·²ç”¨å®Œï¼Œè¯·æ˜å¤©å†è¯•");
+                emitter.send("½ñÈÕ Token Åä¶îÒÑÓÃÍê£¬ÇëÃ÷ÌìÔÙÊÔ");
                 emitter.complete();
             } catch (IOException e) {
                 emitter.completeWithError(e);
@@ -85,34 +99,37 @@ public class ChatController {
             return emitter;
         }
 
-        // æ•è·å½“å‰ SecurityContext
         SecurityContext context = SecurityContextHolder.getContext();
 
-
         SseEmitter emitter = new SseEmitter(60_000L);
-        //
-        executor.submit(()->{
-            // æ‰‹åŠ¨è®¾ç½®åˆ°è™šæ‹Ÿçº¿ç¨‹é‡Œ
+        executor.submit(() -> {
             SecurityContextHolder.setContext(context);
-            try{
-                policyAgent.streamChat(message,promptService.getPrompt("policy_agent", DEFAULT_PROMPT))
+            try {
+                policyAgent.streamChat(message, promptService.getPrompt("policy_agent", DEFAULT_PROMPT))
                         .onNext(token -> {
-                            try{
+                            try {
                                 emitter.send(token);
-                            }catch (IOException e){
+                            } catch (IOException e) {
                                 emitter.completeWithError(e);
                             }
                         })
-                        .onComplete( response -> emitter.complete())
-                .onError( error -> emitter.completeWithError(error))
+                        .onComplete(response -> emitter.complete())
+                        .onError(emitter::completeWithError)
                         .start();
-            }catch (Exception e){
+            } catch (Exception e) {
                 emitter.completeWithError(e);
             } finally {
-                SecurityContextHolder.clearContext();  // ç”¨å®Œæ¸…é™¤ï¼Œé˜²æ­¢å†…å­˜æ³„æ¼
+                SecurityContextHolder.clearContext();
             }
         });
-        return  emitter;
+        return emitter;
     }
 
+    public record ChatRequest(String message) {
+    }
+
+    private String getCurrentUsername() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? auth.getName() : "anonymous";
+    }
 }
