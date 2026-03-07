@@ -27,13 +27,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import javax.sql.DataSource;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Configuration
 public class LangChainConfig {
 
-    private Logger log = LoggerFactory.getLogger(LangChainConfig.class);
+    private static final Pattern PG_JDBC_PATTERN = Pattern.compile("^jdbc:postgresql://([^:/?#]+)(?::(\\d+))?/([^?]+).*$");
+    private final Logger log = LoggerFactory.getLogger(LangChainConfig.class);
 
     @Value("${DEEPSEEK_API_KEY}")
     private String apiKey;
@@ -41,6 +43,14 @@ public class LangChainConfig {
     @Value("${EMBEDDING_API_KEY}")
     private String embeddingApiKey;
 
+    @Value("${spring.datasource.url}")
+    private String datasourceUrl;
+
+    @Value("${spring.datasource.username}")
+    private String datasourceUsername;
+
+    @Value("${spring.datasource.password}")
+    private String datasourcePassword;
 
     @Bean
     public ChatLanguageModel chatLanguageModel(ChatModelListener chatModelListener) {
@@ -61,37 +71,29 @@ public class LangChainConfig {
                 .build();
     }
 
-
     @Bean
-    public EmbeddingStore<TextSegment> embeddingStore(DataSource dataSource) {
+    public EmbeddingStore<TextSegment> embeddingStore() {
+        PgJdbcInfo pg = parsePgJdbcUrl(datasourceUrl);
         return PgVectorEmbeddingStore.builder()
-                .host("192.168.20.129")
-                .port(5432)
-                .database("ragdb")
-                .user("pgsql")
-                .password("123456")
+                .host(pg.host())
+                .port(pg.port())
+                .database(pg.database())
+                .user(datasourceUsername)
+                .password(datasourcePassword)
                 .table("rag_embeddings")
                 .dimension(1536)
                 .createTable(true)
                 .build();
     }
 
-
-    /**
-     * LangChain4j 的 ChatMemory 用于在对话过程中保留上下文信息，增强模型的连续对话能力。
-     * @return
-     */
     @Bean
     public ChatMemory chatMemory() {
-        return MessageWindowChatMemory.withMaxMessages(10); // 保留最近10条对话
+        return MessageWindowChatMemory.withMaxMessages(10);
     }
 
-    /**
-     * 注入自定义 agent
-     */
     @Bean
-    public PolicyAgent policyAgent(ChatLanguageModel chatLanguageModel, AgentTools agentTools, ChatMemory chatMemory
-    ,ChatModelListener chatModelListener) {
+    public PolicyAgent policyAgent(ChatLanguageModel chatLanguageModel, AgentTools agentTools, ChatMemory chatMemory,
+                                   ChatModelListener chatModelListener) {
         return AiServices.builder(PolicyAgent.class)
                 .chatLanguageModel(chatLanguageModel)
                 .streamingChatLanguageModel(streamingChatLanguageModel(chatModelListener))
@@ -110,11 +112,6 @@ public class LangChainConfig {
                 .build();
     }
 
-    /**
-     * 注册agent 汇总bean
-     * @param chatLanguageModel
-     * @return
-     */
     @Bean
     public SummaryAgent summaryAgent(ChatLanguageModel chatLanguageModel) {
         return AiServices.builder(SummaryAgent.class)
@@ -122,11 +119,6 @@ public class LangChainConfig {
                 .build();
     }
 
-    /**
-     * 任务编排bean
-     * @param chatLanguageModel
-     * @return
-     */
     @Bean
     public OrchestratorAgent orchestratorAgent(ChatLanguageModel chatLanguageModel) {
         return AiServices.builder(OrchestratorAgent.class)
@@ -134,49 +126,51 @@ public class LangChainConfig {
                 .build();
     }
 
-
-    /**
-     * 可观测性
-     */
     @Bean
     public ChatModelListener chatModelListener(TokenMonitorService tokenMonitorService) {
         return new ChatModelListener() {
 
             @Override
             public void onRequest(ChatModelRequestContext ctx) {
-                // 这里还在主线程，能拿到 SecurityContext
                 var auth = SecurityContextHolder.getContext().getAuthentication();
                 String username = auth != null ? auth.getName() : "anonymous";
-                ctx.attributes().put("username", username);  // ← 存入请求属性
-                log.info("📤 LLM 请求发出，用户：{}", username);
+                ctx.attributes().put("username", username);
+                log.info("LLM request sent, user: {}", username);
             }
 
             @Override
             public void onResponse(ChatModelResponseContext ctx) {
                 var tokenUsage = ctx.response().tokenUsage();
                 if (tokenUsage != null) {
-                    var auth = SecurityContextHolder.getContext().getAuthentication();
                     String username = (String) ctx.attributes().getOrDefault("username", "anonymous");
                     tokenMonitorService.record(
                             username,
                             tokenUsage.inputTokenCount(),
                             tokenUsage.outputTokenCount()
                     );
-                    log.info("📥 LLM 响应完成，用户 {}，Token 消耗：{}", username, tokenUsage.totalTokenCount());
+                    log.info("LLM response completed, user: {}, token total: {}", username, tokenUsage.totalTokenCount());
                 }
             }
 
             @Override
             public void onError(ChatModelErrorContext ctx) {
-                log.error("❌ LLM 调用出错：{}", ctx.error().getMessage());
-            }
-
-            private String getUsernameFromContext() {
-                // 从 Spring Security 上下文获取当前用户
-                var auth = org.springframework.security.core.context.SecurityContextHolder
-                        .getContext().getAuthentication();
-                return auth != null ? auth.getName() : "anonymous";
+                log.error("LLM call failed: {}", ctx.error().getMessage());
             }
         };
+    }
+
+    private PgJdbcInfo parsePgJdbcUrl(String url) {
+        Matcher matcher = PG_JDBC_PATTERN.matcher(url);
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException("Unsupported PostgreSQL JDBC URL: " + url);
+        }
+
+        String host = matcher.group(1);
+        int port = matcher.group(2) != null ? Integer.parseInt(matcher.group(2)) : 5432;
+        String database = matcher.group(3);
+        return new PgJdbcInfo(host, port, database);
+    }
+
+    private record PgJdbcInfo(String host, int port, String database) {
     }
 }
