@@ -10,6 +10,7 @@ public class AgentRuntimeProperties {
     private int maxSteps = 3;
     private long stepTimeoutMs = 15000L;
     private int retryTimes = 1;
+    private boolean includeTraceInResponse = true;
 
     public int getMaxSteps() {
         return maxSteps;
@@ -33,5 +34,13 @@ public class AgentRuntimeProperties {
 
     public void setRetryTimes(int retryTimes) {
         this.retryTimes = retryTimes;
+    }
+
+    public boolean isIncludeTraceInResponse() {
+        return includeTraceInResponse;
+    }
+
+    public void setIncludeTraceInResponse(boolean includeTraceInResponse) {
+        this.includeTraceInResponse = includeTraceInResponse;
     }
 }

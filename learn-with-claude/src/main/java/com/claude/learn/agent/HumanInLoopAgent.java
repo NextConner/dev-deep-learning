@@ -1,5 +1,7 @@
 package com.claude.learn.agent;
 
+import com.claude.learn.agent.tool.ToolExecutionResult;
+import com.claude.learn.agent.tool.ToolExecutionWrapper;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
 import dev.langchain4j.data.message.*;
@@ -27,10 +29,12 @@ public class HumanInLoopAgent {
 
     private final ChatLanguageModel chatLanguageModel;
     private final AgentTools agentTools;
+    private final ToolExecutionWrapper toolExecutionWrapper;
 
-    public HumanInLoopAgent(ChatLanguageModel chatLanguageModel, AgentTools agentTools) {
+    public HumanInLoopAgent(ChatLanguageModel chatLanguageModel, AgentTools agentTools, ToolExecutionWrapper toolExecutionWrapper) {
         this.chatLanguageModel = chatLanguageModel;
         this.agentTools = agentTools;
+        this.toolExecutionWrapper = toolExecutionWrapper;
     }
 
     public String run(String userInput) throws Exception {
@@ -83,31 +87,20 @@ public class HumanInLoopAgent {
                 }
 
                 // 执行工具
-                String result = executeTool(toolName, toolArgs);
-                log.info("   工具返回：{}", result);
+                ToolExecutionResult result = toolExecutionWrapper.execute(toolName, toolArgs);
 
-                // 结果追加到消息历史
-                messages.add(ToolExecutionResultMessage.from(toolRequest, result));
+                if (result.isSuccess()) {
+                    log.info("   工具返回：{}", result.getOutput());
+                    messages.add(ToolExecutionResultMessage.from(toolRequest, result.getOutput()));
+                } else {
+                    log.error("   工具执行失败：{}", result.getErrorMessage());
+                    messages.add(ToolExecutionResultMessage.from(toolRequest, "工具执行失败：" + result.getErrorMessage()));
+                }
             }
 
         }
 
     }
 
-    private String executeTool(String toolName, String arguments) {
-        // 用反射调用 AgentTools 里对应的方法
-        try {
-            // 解析参数（简化处理）
-            String arg = arguments.replaceAll(".*\":(\\s*\"?)([^\"|}]+).*", "$2").trim();
-            return switch (toolName) {
-                case "searchPolicy" -> agentTools.searchPolicy(arg);
-                case "getWeather" -> agentTools.getWeather(arg);
-                case "sendEmail" -> agentTools.sendEmail(arg);
-                default -> "未知工具：" + toolName;
-            };
-        } catch (Exception e) {
-            return "工具执行失败：" + e.getMessage();
-        }
-    }
-
 }
+

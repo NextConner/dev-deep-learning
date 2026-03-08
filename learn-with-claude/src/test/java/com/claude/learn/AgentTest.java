@@ -29,7 +29,7 @@ public class AgentTest {
 
         // 测试3：需要同时调用两个工具
         System.out.println("=== 测试3 ===");
-        String answer3 = policyAgent.chat("我想现在从北京打车到江苏上海，报销上限是多少？");
+        String answer3 = policyAgent.chat("我想现在从北京打车到江苏上海，报销上限是多少？", "你是一个企业内部智能助手");
         System.out.println("回答：" + answer3);
 
     }
