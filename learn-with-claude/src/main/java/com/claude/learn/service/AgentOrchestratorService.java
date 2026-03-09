@@ -19,6 +19,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.CompletableFuture;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -268,6 +269,21 @@ public class AgentOrchestratorService {
         }
     }
 
+    
+    // 实现
+    private boolean isRetryable(Exception e) {
+        if (e instanceof SocketTimeoutException) {
+            return true;  // 网络超时，可重试
+        }
+        if (e instanceof TimeoutException) {
+            return true;  // LLM超时，可重试
+        }
+        if (e.getMessage().contains("429")) {
+            return true;  // Rate limit，可重试
+        }
+        return false;   // 其他错误不重试
+    }
+
     /**
      * Act阶段：执行工具调用，带重试机制
      *
@@ -300,12 +316,14 @@ public class AgentOrchestratorService {
                 log.warn("Tool execution timed out - stepId: {}, attempt: {}, timeout: {}ms",
                         step.getStepId(), attempt + 1, runtimeProperties.getStepTimeoutMs());
             } catch (Exception e) {
-                // 其他异常：网络错误、API错误等
-                lastErrorCode = AgentErrorCode.TOOL_EXECUTION_FAIL;
-                lastErrorMessage = e.getMessage() == null ? "Tool execution failed" : e.getMessage();
-                log.error("Tool execution failed - stepId: {}, attempt: {}, error: {}",
-                        step.getStepId(), attempt + 1, lastErrorMessage, e);
-            }
+                if (!isRetryable(e)) {
+                    // 其他异常：网络错误、API错误等
+                    lastErrorCode = AgentErrorCode.TOOL_EXECUTION_FAIL;
+                    lastErrorMessage = e.getMessage() == null ? "Tool execution failed" : e.getMessage();
+                    log.error("Tool execution failed - stepId: {}, attempt: {}, error: {}",
+                            step.getStepId(), attempt + 1, lastErrorMessage, e);
+                }
+                            }
         }
 
         // 所有重试都失败，标记步骤失败
