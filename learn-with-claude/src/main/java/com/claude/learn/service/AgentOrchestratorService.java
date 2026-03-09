@@ -4,13 +4,16 @@ import com.claude.learn.agent.PolicyAgent;
 import com.claude.learn.agent.runtime.AgentErrorCode;
 import com.claude.learn.agent.runtime.AgentRun;
 import com.claude.learn.agent.runtime.AgentStep;
+import com.claude.learn.config.AgentMetrics;
 import com.claude.learn.config.AgentRuntimeProperties;
 import com.claude.learn.agent.OrchestratorAgent;
+import com.claude.learn.filter.LocalQueryRouter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ExecutorService;
@@ -19,6 +22,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.CompletableFuture;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -49,13 +53,20 @@ public class AgentOrchestratorService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     // 使用Virtual Thread执行器，Java 21新特性，轻量级线程，适合高并发场景
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    //本地路由
+    private final LocalQueryRouter localQueryRouter;
+    //
+    @Autowired
+    private AgentMetrics agentMetrics;
 
     public AgentOrchestratorService(PolicyAgent policyAgent,
             OrchestratorAgent orchestratorAgent,
-            AgentRuntimeProperties runtimeProperties) {
+            AgentRuntimeProperties runtimeProperties,
+            LocalQueryRouter localQueryRouter) {
         this.policyAgent = policyAgent;
         this.orchestratorAgent = orchestratorAgent;
         this.runtimeProperties = runtimeProperties;
+        this.localQueryRouter = localQueryRouter;
     }
 
     /**
@@ -67,6 +78,7 @@ public class AgentOrchestratorService {
      * @return AgentRun 包含完整执行轨迹的运行记录
      */
     public AgentRun run(String username, String userMessage, String systemPrompt) {
+
         AgentRun run = new AgentRun(username, userMessage);
         String traceId = run.getRunId();
 
@@ -76,6 +88,17 @@ public class AgentOrchestratorService {
         MDC.put("username", username);
 
         try {
+
+            // 本地小模型先做路由判断，不消耗 Deepseek token
+            if (!localQueryRouter.needsRetrieval(userMessage)) {
+                // 直接走模型回答，跳过整个 RAG 流程
+                String answer = policyAgent.chat(userMessage, systemPrompt);
+                run.markSuccess(answer);
+                //todo 测试数据
+                agentMetrics.recordSuccess(3000L);
+                return run;
+            }
+
             log.info("Starting agent run - runId: {}, question: {}", traceId, summarize(userMessage));
 
             // Plan阶段：调用 OrchestratorAgent 拆解任务并选择工具
@@ -88,11 +111,14 @@ public class AgentOrchestratorService {
                     step.start();
                     observe(step, aggregated);
                     run.markSuccess(aggregated);
+                    //todo 测试数据
+                    agentMetrics.recordSuccess(3000L);
                     log.info("Agent run completed successfully (multi-task) - runId: {}, totalSteps: {}, latency: {}ms",
                             traceId, run.getSteps().size(), run.totalLatencyMs());
                     return run;
                 }
-                // if multi-task execution failed, fall through to single-step loop without adding a step
+                // if multi-task execution failed, fall through to single-step loop without
+                // adding a step
                 log.warn("Multi-task execution did not produce a valid answer, continuing with single-step loop");
             }
 
@@ -134,6 +160,7 @@ public class AgentOrchestratorService {
             guardStep.start();
             guardStep.markFailed(AgentErrorCode.MAX_STEPS_EXCEEDED, "Agent reached max steps without a valid answer");
             run.markFailed();
+            agentMetrics.recordFailure();
             return run;
         } finally {
             // 清理MDC，避免内存泄漏和上下文污染
@@ -198,14 +225,14 @@ public class AgentOrchestratorService {
             List<PlanTask> list = new ArrayList<>();
             if (tasks != null && tasks.isArray()) {
                 for (JsonNode task : tasks) {
-                        String type = task.has("type") ? task.get("type").asText() : "unknown";
-                        String query = task.has("query") ? task.get("query").asText() : "";
-                        // ignore sentinel/placeholder task types (e.g. "none") so tests that
-                        // return a single-pass plan don't trigger duplicate executions
-                        if ("none".equalsIgnoreCase(type) || "unknown".equalsIgnoreCase(type)) {
-                            continue;
-                        }
-                        list.add(new PlanTask(type, query));
+                    String type = task.has("type") ? task.get("type").asText() : "unknown";
+                    String query = task.has("query") ? task.get("query").asText() : "";
+                    // ignore sentinel/placeholder task types (e.g. "none") so tests that
+                    // return a single-pass plan don't trigger duplicate executions
+                    if ("none".equalsIgnoreCase(type) || "unknown".equalsIgnoreCase(type)) {
+                        continue;
+                    }
+                    list.add(new PlanTask(type, query));
                 }
             }
             return list;
@@ -267,6 +294,21 @@ public class AgentOrchestratorService {
         }
     }
 
+    
+    // 实现
+    private boolean isRetryable(Exception e) {
+        if (e instanceof SocketTimeoutException) {
+            return true;  // 网络超时，可重试
+        }
+        if (e instanceof TimeoutException) {
+            return true;  // LLM超时，可重试
+        }
+        if (e.getMessage().contains("429")) {
+            return true;  // Rate limit，可重试
+        }
+        return false;   // 其他错误不重试
+    }
+
     /**
      * Act阶段：执行工具调用，带重试机制
      *
@@ -299,12 +341,14 @@ public class AgentOrchestratorService {
                 log.warn("Tool execution timed out - stepId: {}, attempt: {}, timeout: {}ms",
                         step.getStepId(), attempt + 1, runtimeProperties.getStepTimeoutMs());
             } catch (Exception e) {
-                // 其他异常：网络错误、API错误等
-                lastErrorCode = AgentErrorCode.TOOL_EXECUTION_FAIL;
-                lastErrorMessage = e.getMessage() == null ? "Tool execution failed" : e.getMessage();
-                log.error("Tool execution failed - stepId: {}, attempt: {}, error: {}",
-                        step.getStepId(), attempt + 1, lastErrorMessage, e);
-            }
+                if (!isRetryable(e)) {
+                    // 其他异常：网络错误、API错误等
+                    lastErrorCode = AgentErrorCode.TOOL_EXECUTION_FAIL;
+                    lastErrorMessage = e.getMessage() == null ? "Tool execution failed" : e.getMessage();
+                    log.error("Tool execution failed - stepId: {}, attempt: {}, error: {}",
+                            step.getStepId(), attempt + 1, lastErrorMessage, e);
+                }
+                            }
         }
 
         // 所有重试都失败，标记步骤失败
