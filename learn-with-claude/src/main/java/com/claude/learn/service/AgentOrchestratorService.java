@@ -92,7 +92,8 @@ public class AgentOrchestratorService {
                             traceId, run.getSteps().size(), run.totalLatencyMs());
                     return run;
                 }
-                // if multi-task execution failed, fall through to single-step loop without adding a step
+                // if multi-task execution failed, fall through to single-step loop without
+                // adding a step
                 log.warn("Multi-task execution did not produce a valid answer, continuing with single-step loop");
             }
 
@@ -198,14 +199,14 @@ public class AgentOrchestratorService {
             List<PlanTask> list = new ArrayList<>();
             if (tasks != null && tasks.isArray()) {
                 for (JsonNode task : tasks) {
-                        String type = task.has("type") ? task.get("type").asText() : "unknown";
-                        String query = task.has("query") ? task.get("query").asText() : "";
-                        // ignore sentinel/placeholder task types (e.g. "none") so tests that
-                        // return a single-pass plan don't trigger duplicate executions
-                        if ("none".equalsIgnoreCase(type) || "unknown".equalsIgnoreCase(type)) {
-                            continue;
-                        }
-                        list.add(new PlanTask(type, query));
+                    String type = task.has("type") ? task.get("type").asText() : "unknown";
+                    String query = task.has("query") ? task.get("query").asText() : "";
+                    // ignore sentinel/placeholder task types (e.g. "none") so tests that
+                    // return a single-pass plan don't trigger duplicate executions
+                    if ("none".equalsIgnoreCase(type) || "unknown".equalsIgnoreCase(type)) {
+                        continue;
+                    }
+                    list.add(new PlanTask(type, query));
                 }
             }
             return list;
