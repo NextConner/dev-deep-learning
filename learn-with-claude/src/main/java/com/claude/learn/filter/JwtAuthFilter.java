@@ -8,13 +8,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Set;
 
 /**
  * 一次性身份验证过滤器
@@ -56,8 +57,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         //token 合法，设置认证信息到SecurityContext（如果需要）
         String userName = jwtService.extractUsername(token);
+        Set<SimpleGrantedAuthority> authorities = "admin".equalsIgnoreCase(userName)
+                ? Set.of(new SimpleGrantedAuthority("ROLE_AI_ADMIN"), new SimpleGrantedAuthority("ROLE_AI_OPS"))
+                : Set.of(new SimpleGrantedAuthority("ROLE_AI_USER"));
+
         UsernamePasswordAuthenticationToken authToke = new UsernamePasswordAuthenticationToken(
-                userName,null, List.of()
+                userName, null, authorities
         );
         authToke.setDetails(new WebAuthenticationDetailsSource()
                 .buildDetails(request));

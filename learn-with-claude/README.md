@@ -8,6 +8,8 @@
 - SSE 流式对话输出
 - Token 用量统计与配额控制
 - 双认证模式：`local-jwt` / `enterprise-jwt`
+- 方法级鉴权（`@PreAuthorize`，高风险接口限权）
+- 安全审计日志（`audit_log`）
 
 ## 技术栈
 
@@ -43,7 +45,7 @@ src/main/resources
 
 ## 配置说明
 
-## 1) 数据库配置
+### 1) 数据库配置
 
 项目启动时会执行 `src/main/resources/schema.sql`。请先保证数据库可连接，并提前安装 pgvector：
 
@@ -125,8 +127,10 @@ mvn clean spring-boot:run
 - `POST /api/auth/login`（仅 local-jwt 有意义）
 - `POST /api/chat`
 - `GET /api/chat/stream?message=...`（Header 带 `Authorization: Bearer <token>`）
-- `POST /api/document/upload`（multipart/form-data）
+- `POST /api/document/upload`（multipart/form-data，需 `AI_ADMIN` 或 `AI_OPS`）
 - `GET /api/usage`
+- `GET /api/tools/health` / `dashboard` / `recommendations`（需 `AI_ADMIN` 或 `AI_OPS`）
+- `POST /api/tools/{toolName}/reset-stats`（需 `AI_ADMIN`）
 
 ## SSE 鉴权说明
 
@@ -144,7 +148,8 @@ mvn test
 ## 已知事项
 
 - `AuthController` 的固定账号密码仅用于本地演示，请勿用于生产。
-- 企业模式当前为 Iteration 1，可继续补充方法级鉴权（`@PreAuthorize`）、审计日志、数据域访问控制。
+- 当前 enterprise token 仍为共享密钥验签（HMAC），建议下一步替换为 JWK / introspection。
+- 数据域访问控制（按 `dataScopes` 过滤检索与工具调用）仍需在后续迭代补齐。
 
 ## 参考
 

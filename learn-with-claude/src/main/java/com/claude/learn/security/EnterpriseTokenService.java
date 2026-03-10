@@ -1,6 +1,7 @@
 package com.claude.learn.security;
 
 import com.claude.learn.config.EnterpriseIdentityProperties;
+import com.claude.learn.config.SecurityModeProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -16,9 +17,13 @@ import java.util.Set;
 public class EnterpriseTokenService {
 
     private final EnterpriseIdentityProperties properties;
+    private final SecurityModeProperties securityModeProperties;
 
-    public EnterpriseTokenService(EnterpriseIdentityProperties properties) {
+    public EnterpriseTokenService(EnterpriseIdentityProperties properties,
+                                  SecurityModeProperties securityModeProperties) {
         this.properties = properties;
+        this.securityModeProperties = securityModeProperties;
+        validateRequiredIdentityConfig();
     }
 
     public UserPrincipal parsePrincipal(String token) {
@@ -41,6 +46,18 @@ public class EnterpriseTokenService {
         Set<String> dataScopes = extractSet(claims.get(properties.getDataScopesClaim()));
 
         return new UserPrincipal(userId, username, deptId, roles, dataScopes);
+    }
+
+    private void validateRequiredIdentityConfig() {
+        if (!securityModeProperties.isEnterpriseJwtMode()) {
+            return;
+        }
+        if (properties.getIssuer() == null || properties.getIssuer().isBlank()) {
+            throw new IllegalStateException("security.identity.issuer is required when security.mode=enterprise-jwt");
+        }
+        if (properties.getAudience() == null || properties.getAudience().isBlank()) {
+            throw new IllegalStateException("security.identity.audience is required when security.mode=enterprise-jwt");
+        }
     }
 
     private Claims parseClaims(String token) {
