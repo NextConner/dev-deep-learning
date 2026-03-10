@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * 本地模型前置路由
+ */
 @Component
 public class LocalQueryRouter {
 

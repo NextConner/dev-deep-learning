@@ -1,0 +1,5 @@
+{
+  "name": "企业AI助手",
+  "description": "企业内部AI助手配套应用，支持智能问答与流式响应。",
+  "requestFramePermissions": ["microphone"]
+}
