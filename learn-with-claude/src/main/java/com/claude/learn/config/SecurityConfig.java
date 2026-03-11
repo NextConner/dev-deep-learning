@@ -1,9 +1,6 @@
 package com.claude.learn.config;
 
-import com.claude.learn.filter.EnterpriseJwtAuthFilter;
-import com.claude.learn.filter.JwtAuthFilter;
-import com.claude.learn.filter.InputSecurityFilter;
-import com.claude.learn.filter.SecurityAuditFilter;
+import com.claude.learn.filter.*;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -64,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()                  // 其余全部需要认证
                 )
+                //MDC TraceId 过滤器放在最前面，确保所有日志都能带上 traceId
+                .addFilterBefore(new TraceIdFilter(), TraceIdFilter.class)
                 .addFilterBefore(resolveAuthFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(inputSecurityFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(securityAuditFilter, InputSecurityFilter.class)
