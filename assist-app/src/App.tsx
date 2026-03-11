@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Login } from './components/Login';
 import { ChatInterface } from './components/ChatInterface';
+import { Watermark } from './components/Watermark';
 import { User } from './types';
 
 export default function App() {
@@ -22,8 +23,8 @@ export default function App() {
     }
   }, []);
 
-  const handleLogin = (username: string, token: string, tokenUsage: number) => {
-    const newUser = { username, isLoggedIn: true, tokenUsage, token };
+  const handleLogin = (username: string, tokenUsage: number) => {
+    const newUser = { username, isLoggedIn: true, tokenUsage };
     setUser(newUser);
     localStorage.setItem('ai_assistant_user', JSON.stringify(newUser));
   };
@@ -35,11 +36,14 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-100 relative">
       {!user.isLoggedIn ? (
         <Login onLogin={handleLogin} />
       ) : (
-        <ChatInterface user={user} onLogout={handleLogout} />
+        <>
+          <Watermark text={user.username} />
+          <ChatInterface user={user} onLogout={handleLogout} />
+        </>
       )}
     </div>
   );

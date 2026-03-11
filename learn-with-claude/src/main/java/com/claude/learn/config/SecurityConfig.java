@@ -61,14 +61,11 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()                  // 其余全部需要认证
                 )
-                //MDC TraceId 过滤器放在最前面，确保所有日志都能带上 traceId
-                .addFilterBefore(new TraceIdFilter(), TraceIdFilter.class)
                 .addFilterBefore(resolveAuthFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(inputSecurityFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(securityAuditFilter, InputSecurityFilter.class)
                 .build();
     }
-
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

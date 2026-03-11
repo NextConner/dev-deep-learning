@@ -10,6 +10,8 @@ import com.claude.learn.agent.OrchestratorAgent;
 import com.claude.learn.filter.LocalQueryRouter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -58,6 +60,8 @@ public class AgentOrchestratorService {
     //
     @Autowired
     private AgentMetrics agentMetrics;
+    @Autowired
+    private Tracer tracer;
 
     public AgentOrchestratorService(PolicyAgent policyAgent,
             OrchestratorAgent orchestratorAgent,
@@ -79,6 +83,12 @@ public class AgentOrchestratorService {
      */
     public AgentRun run(String username, String userMessage, String systemPrompt) {
 
+        Span span = tracer.nextSpan()
+                .name("agent.orchestrator.run")
+                .tag("username", username)
+                .tag("message.length", String.valueOf(userMessage.length()))
+                .start();
+
         AgentRun run = new AgentRun(username, userMessage);
         String traceId = run.getRunId();
 
@@ -87,7 +97,7 @@ public class AgentOrchestratorService {
         MDC.put("traceId", traceId);
         MDC.put("username", username);
 
-        try {
+        try (Tracer.SpanInScope ws = tracer.withSpan(span)) {
 
             // 本地小模型先做路由判断，不消耗 Deepseek token
             if (!localQueryRouter.needsRetrieval(userMessage)) {
@@ -96,6 +106,7 @@ public class AgentOrchestratorService {
                 run.markSuccess(answer);
                 //todo 测试数据
                 agentMetrics.recordSuccess(3000L);
+                span.tag("run.status", "success").tag("run.path", "local");
                 return run;
             }
 
@@ -113,6 +124,9 @@ public class AgentOrchestratorService {
                     run.markSuccess(aggregated);
                     //todo 测试数据
                     agentMetrics.recordSuccess(3000L);
+                    span.tag("run.status", "success")
+                        .tag("run.path", "multi_task")
+                        .tag("steps.count", String.valueOf(run.getSteps().size()));
                     log.info("Agent run completed successfully (multi-task) - runId: {}, totalSteps: {}, latency: {}ms",
                             traceId, run.getSteps().size(), run.totalLatencyMs());
                     return run;
@@ -141,6 +155,9 @@ public class AgentOrchestratorService {
                     // Observe阶段：记录执行结果
                     observe(step, answer);
                     run.markSuccess(answer);
+                    span.tag("run.status", "success")
+                        .tag("run.path", "single_step")
+                        .tag("steps.count", String.valueOf(run.getSteps().size()));
                     log.info("Agent run completed successfully - runId: {}, totalSteps: {}, latency: {}ms",
                             traceId, run.getSteps().size(), run.totalLatencyMs());
                     return run;
@@ -161,8 +178,10 @@ public class AgentOrchestratorService {
             guardStep.markFailed(AgentErrorCode.MAX_STEPS_EXCEEDED, "Agent reached max steps without a valid answer");
             run.markFailed();
             agentMetrics.recordFailure();
+            span.tag("run.status", "failed").tag("run.error", "max_steps_exceeded");
             return run;
         } finally {
+            span.end();
             // 清理MDC，避免内存泄漏和上下文污染
             MDC.clear();
         }
