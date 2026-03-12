@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +17,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.UUID;
+
+import static io.prometheus.metrics.model.snapshots.Exemplar.TRACE_ID;
 
 /**
  * 一次性身份验证过滤器
@@ -38,6 +42,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
         log.info("🔍 请求路径：{}", path);
+        MDC.put(TRACE_ID, UUID.randomUUID().toString().replace("-", ""));
         //放行登录接口和静态资源
         if (path.equals("/index.html")
                 || path.equals("/")
@@ -76,6 +81,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
+        }
+        // SSE 等场景浏览器无法设置自定义 header，允许从 query param 传 token
+        String queryToken = request.getParameter("token");
+        if (queryToken != null && !queryToken.isBlank()) {
+            return queryToken;
         }
         return null;
     }

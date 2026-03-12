@@ -15,4 +15,6 @@
 /learn-with-claude/.claude/settings.local.json
 /learn-with-claude/.claude/
 /.vscode/
+/logs/app.log
+
 /*.iml

@@ -5,9 +5,9 @@ spring:
   application:
     name: learn-from-claude
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ragdb}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    url: jdbc:postgresql://192.168.20.129:5432/ragdb
+    username: ${SPRING_DATASOURCE_USERNAME:pgsql}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
   jpa:
     hibernate:
       ddl-auto: none
@@ -17,9 +17,6 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema.sql
-logging:
-  level:
-    org.springframework.security: DEBUG
 
 security:
   mode: ${SECURITY_MODE:local-jwt} # local-jwt | enterprise-jwt
@@ -89,9 +86,9 @@ management:
   tracing:
     sampling:
       probability: 1.0  # 开发环境全采样，生产环境改成 0.1
-zipkin:
-  tracing:
-    endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+  otlp:
+    tracing:
+      endpoint: http://192.168.20.129:4318/v1/traces
 
 resilience4j:
   circuitbreaker:
@@ -115,10 +112,30 @@ app:
       provider: ${APP_MODELS_FALLBACK_PROVIDER:openai-compatible}
       base-url: ${APP_MODELS_FALLBACK_BASE_URL:http://localhost:11434/v1}
       api-key: ${APP_MODELS_FALLBACK_API_KEY:ollama}
-      model-name: ${APP_MODELS_FALLBACK_MODEL_NAME:llama3.2:3b}
+      model-name: ${APP_MODELS_FALLBACK_MODEL_NAME:phi3:mini}
       max-tokens: ${APP_MODELS_FALLBACK_MAX_TOKENS:2048}
-    back:
-      provider: ${APP_MODELS_BACK_PROVIDER:anthropic}
-      api-key: ${ANTHROPIC_API_KEY}
-      model-name: ${APP_MODELS_BACK_MODEL_NAME:claude-sonnet-4-6}
-      max-tokens: ${APP_MODELS_BACK_MAX_TOKENS:4096}
+#    back:
+#      provider: ${APP_MODELS_BACK_PROVIDER:anthropic}
+#      api-key: ${ANTHROPIC_API_KEY}
+#      model-name: ${APP_MODELS_BACK_MODEL_NAME:claude-sonnet-4-6}
+#      max-tokens: ${APP_MODELS_BACK_MAX_TOKENS:4096}
+
+
+# ========== 日志配置 ==========
+logging:
+  level:
+    root: INFO
+    com.example: DEBUG          # 指定包的日志级别
+
+  file:
+    name: logs/app.log            # 日志文件路径
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"
+
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB         # 单文件最大 10MB（可选，用于 size+time 混合策略）
+      max-history: 7              # 保留最近 7 天的日志文件
+      total-size-cap: 20MB         # 所有归档日志总大小上限
+      clean-history-on-start: true
