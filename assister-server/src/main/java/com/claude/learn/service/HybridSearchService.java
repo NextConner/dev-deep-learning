@@ -3,7 +3,7 @@ package com.claude.learn.service;
 
 import com.claude.learn.domain.DocumentSegment;
 import com.claude.learn.domain.ScoredDocument;
-import com.claude.learn.repository.DocumentRepository;
+import com.claude.learn.repository.DocumentSegmentRepository;
 import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -20,12 +20,12 @@ public class HybridSearchService {
 
     private final EmbeddingModel embeddingModel;
     private final EmbeddingStore<TextSegment> embeddingStore;
-    private final DocumentRepository repository;
+    private final DocumentSegmentRepository repository;
 
     public HybridSearchService(
             EmbeddingModel embeddingModel,
             EmbeddingStore<TextSegment> embeddingStore,
-            DocumentRepository repository) {
+            DocumentSegmentRepository repository) {
         this.embeddingModel = embeddingModel;
         this.embeddingStore = embeddingStore;
         this.repository = repository;
@@ -113,7 +113,7 @@ public class HybridSearchService {
             double score = cosineSimilarity(queryEmbedding.vector(), docEmbedding.vector());
             scored.add(new ScoredDocument(doc, score, docEmbedding.vector()));
         }
-        scored.sort((a, b) -> Double.compare(b.score(), a.score()));
+        scored.sort((a, b) -> Double.compare(b.score, a.score));
         return scored;
     }
 
@@ -127,17 +127,17 @@ public class HybridSearchService {
             double bestScore = -Double.MAX_VALUE;
 
             for (ScoredDocument doc : docs) {
-                double relevance = doc.score();
+                double relevance = doc.score;
                 double diversity = 0.0;
 
                 for (String sel : selected) {
                     float[] selEmbedding = docs.stream()
-                            .filter(d -> d.text().equals(sel))
+                            .filter(d -> d.text.equals(sel))
                             .findFirst()
-                            .map(ScoredDocument::embedding)
+                            .map(ScoredDocument::getEmbedding)
                             .orElse(null);
                     if (selEmbedding != null) {
-                        diversity = Math.max(diversity, cosineSimilarity(doc.embedding(), selEmbedding));
+                        diversity = Math.max(diversity, cosineSimilarity(doc.embedding, selEmbedding));
                     }
                 }
 
@@ -148,7 +148,7 @@ public class HybridSearchService {
                 }
             }
 
-            selected.add(best.text());
+            selected.add(best.text);
             docs.remove(best);
         }
 

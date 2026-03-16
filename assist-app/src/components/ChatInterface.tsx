@@ -1198,9 +1198,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ user, onLogout, en
             </div>
           </div>
         </div>
-        <p className="text-[10px] text-center text-stone-400 mt-4 font-medium tracking-wide">
-          AI 生成内容仅供参考 · 保护公司数据安全
-        </p>
+//         <p className="text-[10px] text-center text-stone-400 mt-4 font-medium tracking-wide">
+//
+//         </p>
       </footer>
 
       <AnimatePresence>
