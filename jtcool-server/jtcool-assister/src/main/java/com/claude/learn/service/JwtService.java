@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Service
@@ -18,6 +20,8 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long expiration;
 
+    @Value("${jwt.jtcool-secret:abcdefghijklmnopqrstuvwxyz}")
+    private String jtcoolSecret;
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
@@ -49,11 +53,32 @@ public class JwtService {
     }
 
     private Claims extractClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        RuntimeException lastError = null;
+        for (String candidate : new String[] { secret, jtcoolSecret }) {
+            try {
+                return parseClaims(token, candidate);
+            } catch (RuntimeException error) {
+                lastError = error;
+            }
+        }
+        throw lastError == null ? new IllegalArgumentException("Invalid token") : lastError;
+    }
+
+    private Claims parseClaims(String token, String signingSecret) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(Keys.hmacShaKeyFor(signingSecret.getBytes(StandardCharsets.UTF_8)))
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (RuntimeException ignored) {
+            SecretKey legacyKey = new SecretKeySpec(signingSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
+            return Jwts.parser()
+                    .verifyWith(legacyKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        }
     }
 
 }

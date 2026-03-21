@@ -7,7 +7,7 @@ const baseUrl = 'http://localhost:8080' // 后端接口
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd())
-  const { VITE_APP_ENV } = env
+  const { VITE_APP_ENV, VITE_APP_ASSIST_TARGET } = env
   return {
     // 部署生产环境和开发环境下的URL。
     // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
@@ -51,6 +51,11 @@ export default defineConfig(({ mode, command }) => {
           target: baseUrl,
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/dev-api/, '')
+        },
+        '/assist-api': {
+          target: VITE_APP_ASSIST_TARGET || 'http://localhost:8081',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/assist-api/, '')
         },
          // springdoc proxy
          '^/v3/api-docs/(.*)': {

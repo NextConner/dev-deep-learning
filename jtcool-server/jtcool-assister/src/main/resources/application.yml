@@ -46,6 +46,7 @@ security:
 
 jwt:
   secret: ${JWT_SECRET:change-me-in-production}
+  jtcool-secret: ${JTCOOL_TOKEN_SECRET:abcdefghijklmnopqrstuvwxyz}
   expiration: 86400000  # 24小时，单位毫秒
 rag:
   chunk:
