@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd \"D:\\\\code\\\\github\\\\my-deep-learning\" && echo \"=== App.tsx handleLogin ===\" && sed -n '26,30p' assist-app/src/App.tsx && echo -e \"\\\\n=== Login.tsx imports ===\" && sed -n '1,13p' assist-app/src/components/Login.tsx && echo -e \"\\\\n=== ChatInterface.tsx imports ===\" && head -10 assist-app/src/components/ChatInterface.tsx)"
+      "Bash(cd \"D:\\\\code\\\\github\\\\my-deep-learning\" && echo \"=== App.tsx handleLogin ===\" && sed -n '26,30p' assist-app/src/App.tsx && echo -e \"\\\\n=== Login.tsx imports ===\" && sed -n '1,13p' assist-app/src/components/Login.tsx && echo -e \"\\\\n=== ChatInterface.tsx imports ===\" && head -10 assist-app/src/components/ChatInterface.tsx)",
+      "Bash(curl -s https://api.github.com/repos/young1lin/claude-token-monitor/releases/latest | grep '\"tag_name\"' | sed -E 's/.*\"v\\([^\"]+\\)\".*/\\\\1/')",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri 'https://github.com/young1lin/claude-token-monitor/releases/latest/download/statusline_windows_amd64.zip' -OutFile '$env:TEMP\\\\statusline.zip'; Expand-Archive -Path '$env:TEMP\\\\statusline.zip' -DestinationPath \\\\\"$env:USERPROFILE\\\\.claude\\\\\" -Force; Remove-Item '$env:TEMP\\\\statusline.zip'\")"
     ]
   }
 }

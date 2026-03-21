@@ -20,3 +20,4 @@
 /*.iml
 /assister-server/target/
 */target/
+.claude/settings.local.json
