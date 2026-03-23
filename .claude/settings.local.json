@@ -8,7 +8,18 @@
       "Bash(ls ~/.claude/statusline* 2>/dev/null || echo \"NOT_INSTALLED\")",
       "Bash(powershell -Command \"Write-Output 'Starting download...'; Invoke-WebRequest -Uri 'https://github.com/young1lin/claude-token-monitor/releases/latest/download/statusline_windows_amd64.zip' -OutFile \\\\\"$env:TEMP\\\\\\\\statusline.zip\\\\\"; Write-Output 'Download complete. Extracting...'; Expand-Archive -Path \\\\\"$env:TEMP\\\\\\\\statusline.zip\\\\\" -DestinationPath \\\\\"$env:USERPROFILE\\\\\\\\.claude\\\\\" -Force; Write-Output 'Extraction complete.'; Remove-Item \\\\\"$env:TEMP\\\\\\\\statusline.zip\\\\\"; Write-Output 'Done.'\")",
       "Bash(powershell -Command \"Invoke-WebRequest -Uri 'https://github.com/young1lin/claude-token-monitor/releases/latest/download/statusline_windows_amd64.zip' -OutFile 'C:\\\\\\\\Users\\\\\\\\Windows\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\statusline.zip'; Expand-Archive -Path 'C:\\\\\\\\Users\\\\\\\\Windows\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\statusline.zip' -DestinationPath 'C:\\\\\\\\Users\\\\\\\\Windows\\\\\\\\.claude' -Force; Remove-Item 'C:\\\\\\\\Users\\\\\\\\Windows\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\statusline.zip'; Write-Output 'Done'\")",
-      "Bash(ls ~/.claude/statusline* 2>/dev/null && ~/.claude/statusline.exe --version 2>/dev/null || echo \"BINARY_CHECK_FAILED\")"
+      "Bash(ls ~/.claude/statusline* 2>/dev/null && ~/.claude/statusline.exe --version 2>/dev/null || echo \"BINARY_CHECK_FAILED\")",
+      "Bash(find /d/github/dev-deep-learning -type d -name \"*wms*\" -o -type d -name \"*inventory*\" -o -type d -name \"*stock*\" 2>/dev/null | head -20)",
+      "Bash(find /d/github/dev-deep-learning/jtcool-server -type f -name \"*.java\" | xargs grep -l \"order\\\\|product\\\\|customer\\\\|warehouse\" -i | head -20)",
+      "Bash(grep -r \"profile\\\\|upload\" /d/github/dev-deep-learning/jtcool-server/jtcool-admin/src/main/resources/application*.yml 2>/dev/null | head -20)",
+      "Bash(find /d/github/dev-deep-learning/jtcool-front/src -type f \\\\\\( -name \"*.vue\" -o -name \"*.ts\" -o -name \"*.js\" \\\\\\) | xargs grep -l \"upload\\\\|Upload\" 2>/dev/null | head -10)",
+      "Bash(find /d/github/dev-deep-learning -name \"*.java\" -type f -exec grep -l \"synchronized\\\\|ReentrantLock\\\\|Semaphore\\\\|CountDownLatch\"  \\\\; 2>/dev/null | head -10)",
+      "Bash(cd D:/github/dev-deep-learning/jtcool-server && mkdir -p jtcool-product/src/main/java/com/jtcool/product && mkdir -p jtcool-product/src/main/resources)",
+      "Bash(cd D:/github/dev-deep-learning/jtcool-server && mkdir -p jtcool-oms/src/main/java/com/jtcool/oms && mkdir -p jtcool-oms/src/main/resources)",
+      "Bash(cd D:/github/dev-deep-learning/jtcool-server && mkdir -p jtcool-wms/src/main/java/com/jtcool/wms && mkdir -p jtcool-wms/src/main/resources)",
+      "Bash(find D:/github/dev-deep-learning/jtcool-server/jtcool-product -type f -name *.java)",
+      "Bash(find D:/github/dev-deep-learning/jtcool-server/jtcool-oms -type f -name *.java)",
+      "Bash(find D:/github/dev-deep-learning/jtcool-server/jtcool-wms -type f -name *.java)"
     ]
   }
 }
