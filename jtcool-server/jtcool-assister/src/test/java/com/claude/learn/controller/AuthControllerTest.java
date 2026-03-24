@@ -18,7 +18,7 @@ class AuthControllerTest {
         SecurityModeProperties mode = new SecurityModeProperties();
         mode.setMode("enterprise-jwt");
 
-        AuthController controller = new AuthController(jwtService, mode);
+        AuthController controller = new AuthController(jwtService, mode, "企业");
         ResponseEntity<?> response = controller.login(new AuthController.LoginRequest("admin", "123456"));
 
         assertEquals(405, response.getStatusCode().value());
@@ -36,7 +36,7 @@ class AuthControllerTest {
         SecurityModeProperties mode = new SecurityModeProperties();
         mode.setMode("local-jwt");
 
-        AuthController controller = new AuthController(jwtService, mode);
+        AuthController controller = new AuthController(jwtService, mode, "企业");
         ResponseEntity<?> response = controller.login(new AuthController.LoginRequest("admin", "123456"));
 
         assertEquals(200, response.getStatusCode().value());
