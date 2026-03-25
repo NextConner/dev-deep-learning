@@ -19,29 +19,87 @@ const emit = defineEmits(['eventClick'])
 const { proxy } = getCurrentInstance()
 const chartRef = ref(null)
 let chartInstance
+const HOUR_MS = 60 * 60 * 1000
+
+function getAxisStartTime(value) {
+  return new Date(value).getTime() - (6 * HOUR_MS)
+}
+
+const sortedEvents = computed(() => [...props.events].sort((a, b) => new Date(a.createTime) - new Date(b.createTime)))
+
+const axisStartTime = computed(() => {
+  if (!sortedEvents.value.length) {
+    return null
+  }
+  return getAxisStartTime(sortedEvents.value[0].createTime)
+})
+
+const axisEndTime = computed(() => {
+  if (!sortedEvents.value.length) {
+    return null
+  }
+  return new Date(sortedEvents.value[sortedEvents.value.length - 1].createTime).getTime() + (6 * HOUR_MS)
+})
+
+const axisMaxHour = computed(() => {
+  if (axisStartTime.value === null || axisEndTime.value === null) {
+    return 0
+  }
+  return Number(((axisEndTime.value - axisStartTime.value) / HOUR_MS).toFixed(2))
+})
+
+const yAxisRange = computed(() => {
+  if (!seriesData.value.length) {
+    return { min: 0, max: 10 }
+  }
+
+  const values = seriesData.value.map(item => item.value[1])
+  const minValue = Math.min(...values)
+  const maxValue = Math.max(...values)
+  const span = Math.max(maxValue - minValue, 1)
+  const topPadding = Math.max(Math.ceil(span * 0.3), 2)
+  const bottomPadding = Math.max(Math.ceil(span * 0.12), 1)
+
+  return {
+    min: minValue - bottomPadding,
+    max: maxValue + topPadding
+  }
+})
 
 const seriesData = computed(() => {
-  const sortedEvents = [...props.events].sort((a, b) => new Date(a.createTime) - new Date(b.createTime))
+  if (!sortedEvents.value.length || axisStartTime.value === null) {
+    return []
+  }
+
   let runningValue = 0
 
-  return sortedEvents.map(event => {
+  return sortedEvents.value.map(event => {
     const quantity = Number(event.changeQuantity || 0)
     runningValue += event.changeType === 'IN' ? quantity : -quantity
     return {
-      value: runningValue,
-      event
+      value: [
+        Number(((new Date(event.createTime).getTime() - axisStartTime.value) / HOUR_MS).toFixed(2)),
+        runningValue
+      ],
+      event,
+      changeLabel: `${event.changeType === 'IN' ? '+' : '-'}${quantity}`
     }
   })
 })
 
-function formatAxisTime(value) {
-  return props.timeUnit === 'hour'
-    ? proxy.parseTime(value, '{m}-{d} {h}:{i}')
-    : proxy.parseTime(value, '{m}-{d}')
+function formatTooltipTime(value) {
+  return proxy.parseTime(value, '{y}-{m}-{d} {h}:{i}:{s}')
 }
 
-function formatTooltipTime(value) {
-  return proxy.parseTime(value, '{y}-{m}-{d} {h}:{i}')
+function formatRelativeHour(value) {
+  return `+${value}`
+}
+
+function formatAxisTick(value) {
+  if (axisStartTime.value === null) {
+    return ''
+  }
+  return proxy.parseTime(axisStartTime.value + (value * HOUR_MS), '{m}-{d} {h}:{i}')
 }
 
 function renderChart() {
@@ -63,7 +121,7 @@ function renderChart() {
     grid: {
       left: 48,
       right: 24,
-      top: 24,
+      top: 44,
       bottom: 36
     },
     tooltip: {
@@ -77,23 +135,36 @@ function renderChart() {
         const sign = event.changeType === 'IN' ? '+' : '-'
         return [
           formatTooltipTime(event.createTime),
+          `相对起点 ${formatRelativeHour(Math.floor(value[0]))}h`,
           `${event.productName || ''} ${event.warehouseName || ''}`.trim(),
           `${event.changeType === 'IN' ? '入库' : '出库'} ${sign}${event.changeQuantity}`,
-          `累计净变化 ${value}`
+          `累计净变化 ${value[1]}`
         ].join('<br/>')
       }
     },
     xAxis: {
-      type: 'category',
+      type: 'value',
+      min: 0,
+      max: axisMaxHour.value,
+      interval: 6,
       boundaryGap: false,
-      data: seriesData.value.map(item => formatAxisTime(item.event.createTime)),
+      name: '时间轴（小时）',
       axisLabel: {
-        color: '#666'
+        color: '#666',
+        formatter: value => formatAxisTick(value)
+      },
+      splitLine: {
+        lineStyle: {
+          color: '#edf2f7',
+          type: 'dashed'
+        }
       }
     },
     yAxis: {
       type: 'value',
       name: '累计净变化',
+      min: yAxisRange.value.min,
+      max: yAxisRange.value.max,
       axisLabel: {
         color: '#666'
       },
@@ -117,8 +188,27 @@ function renderChart() {
         itemStyle: {
           color: params => params.data.event.changeType === 'IN' ? '#10b981' : '#ef4444'
         },
+        label: {
+          show: true,
+          formatter: params => params.data.changeLabel,
+          position: 'top',
+          distance: 10,
+          color: params => params.data.event.changeType === 'IN' ? '#16a34a' : '#dc2626',
+          fontSize: 12,
+          fontWeight: 700,
+          textBorderColor: 'rgba(255, 255, 255, 0.95)',
+          textBorderWidth: 3
+        },
+        labelLayout: {
+          hideOverlap: false,
+          moveOverlap: 'shiftY'
+        },
         areaStyle: {
           color: 'rgba(64, 158, 255, 0.12)'
+        },
+        encode: {
+          x: 0,
+          y: 1
         },
         data: seriesData.value
       }

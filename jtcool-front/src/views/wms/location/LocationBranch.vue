@@ -106,7 +106,7 @@ const props = defineProps({
 
 defineEmits(['add', 'edit', 'delete'])
 
-const expandedMap = reactive()
+const expandedMap = reactive({})
 const inventoryData = reactive({})
 const inventoryLoading = reactive({})
 
