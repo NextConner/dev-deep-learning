@@ -1,37 +1,13 @@
 <template>
   <div class="timeline-chart">
     <div v-if="!events.length" class="empty">暂无数据</div>
-
-    <div v-else class="chart-wrapper">
-      <div class="time-axis">
-        <span v-for="tick in timeTicks" :key="tick.time" class="tick" :style="{left: tick.position + '%'}">
-          {{ formatTick(tick.time) }}
-        </span>
-      </div>
-
-      <div class="timeline">
-        <div class="baseline"></div>
-        <div v-for="event in events" :key="event.logId"
-             class="event-marker"
-             :class="event.changeType"
-             :style="{left: getEventPosition(event) + '%'}"
-             @click="handleClick(event)">
-          <span class="qty-label">{{ event.changeType === 'IN' ? '+' : '-' }}{{ event.changeQuantity }}</span>
-          <div class="triangle"></div>
-          <div class="tooltip">
-            <div>{{ event.changeType === 'IN' ? '入库' : '出库' }}</div>
-            <div>{{ event.changeType === 'IN' ? '+' : '-' }}{{ event.changeQuantity }}</div>
-            <div>{{ formatTime(event.createTime) }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div v-else ref="chartRef" class="chart-wrapper"></div>
   </div>
 </template>
 
 <script setup>
-import { computed, getCurrentInstance } from 'vue'
-import { getTimeRange } from '@/utils/inventoryAnalysis'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import * as echarts from 'echarts'
 
 const props = defineProps({
   events: { type: Array, required: true },
@@ -41,150 +17,154 @@ const props = defineProps({
 const emit = defineEmits(['eventClick'])
 
 const { proxy } = getCurrentInstance()
+const chartRef = ref(null)
+let chartInstance
 
-const timeRange = computed(() => getTimeRange(props.events))
+const seriesData = computed(() => {
+  const sortedEvents = [...props.events].sort((a, b) => new Date(a.createTime) - new Date(b.createTime))
+  let runningValue = 0
 
-const timeTicks = computed(() => {
-  const { min, max, span } = timeRange.value
-  const count = 5
-  return Array.from({ length: count }, (_, i) => ({
-    time: min + (span * i / (count - 1)),
-    position: (i / (count - 1)) * 100
-  }))
+  return sortedEvents.map(event => {
+    const quantity = Number(event.changeQuantity || 0)
+    runningValue += event.changeType === 'IN' ? quantity : -quantity
+    return {
+      value: runningValue,
+      event
+    }
+  })
 })
 
-function getEventPosition(event) {
-  const { min, span } = timeRange.value
-  const time = new Date(event.createTime).getTime()
-  return ((time - min) / span) * 100
-}
-
-function formatTick(time) {
+function formatAxisTime(value) {
   return props.timeUnit === 'hour'
-    ? proxy.parseTime(time, '{m}-{d} {h}:{i}')
-    : proxy.parseTime(time, '{m}-{d}')
+    ? proxy.parseTime(value, '{m}-{d} {h}:{i}')
+    : proxy.parseTime(value, '{m}-{d}')
 }
 
-function formatTime(value) {
+function formatTooltipTime(value) {
   return proxy.parseTime(value, '{y}-{m}-{d} {h}:{i}')
 }
 
-function handleClick(event) {
-  emit('eventClick', event)
+function renderChart() {
+  if (!chartRef.value || !seriesData.value.length) {
+    return
+  }
+
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value)
+    chartInstance.on('click', params => {
+      const event = params.data?.event
+      if (event) {
+        emit('eventClick', event)
+      }
+    })
+  }
+
+  chartInstance.setOption({
+    grid: {
+      left: 48,
+      right: 24,
+      top: 24,
+      bottom: 36
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: items => {
+        const current = items?.[0]?.data
+        if (!current?.event) {
+          return ''
+        }
+        const { event, value } = current
+        const sign = event.changeType === 'IN' ? '+' : '-'
+        return [
+          formatTooltipTime(event.createTime),
+          `${event.productName || ''} ${event.warehouseName || ''}`.trim(),
+          `${event.changeType === 'IN' ? '入库' : '出库'} ${sign}${event.changeQuantity}`,
+          `累计净变化 ${value}`
+        ].join('<br/>')
+      }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: seriesData.value.map(item => formatAxisTime(item.event.createTime)),
+      axisLabel: {
+        color: '#666'
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '累计净变化',
+      axisLabel: {
+        color: '#666'
+      },
+      splitLine: {
+        lineStyle: {
+          color: '#f0f0f0'
+        }
+      }
+    },
+    series: [
+      {
+        name: '库存变化',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        lineStyle: {
+          width: 3,
+          color: '#409eff'
+        },
+        itemStyle: {
+          color: params => params.data.event.changeType === 'IN' ? '#10b981' : '#ef4444'
+        },
+        areaStyle: {
+          color: 'rgba(64, 158, 255, 0.12)'
+        },
+        data: seriesData.value
+      }
+    ]
+  })
+
+  chartInstance.resize()
 }
+
+function handleResize() {
+  chartInstance?.resize()
+}
+
+watch(() => [props.events, props.timeUnit], async () => {
+  if (!props.events.length) {
+    chartInstance?.dispose()
+    chartInstance = null
+    return
+  }
+  await nextTick()
+  renderChart()
+}, { deep: true, immediate: true })
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  chartInstance?.dispose()
+  chartInstance = null
+})
 </script>
 
 <style lang="scss" scoped>
 .timeline-chart {
-  min-height: 80px;
+  min-height: 320px;
 }
 
 .empty {
   text-align: center;
-  padding: 20px;
+  padding: 40px 20px;
   color: #999;
 }
 
 .chart-wrapper {
-  position: relative;
-}
-
-.time-axis {
-  position: relative;
-  height: 20px;
-  margin-bottom: 10px;
-
-  .tick {
-    position: absolute;
-    transform: translateX(-50%);
-    font-size: 11px;
-    color: #666;
-  }
-}
-
-.timeline {
-  position: relative;
-  height: 60px;
-
-  .baseline {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: #ddd;
-  }
-}
-
-.event-marker {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-
-  .qty-label {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    margin-bottom: 2px;
-  }
-
-  &.IN .qty-label {
-    color: #10b981;
-  }
-
-  &.OUT .qty-label {
-    color: #ef4444;
-  }
-
-  .triangle {
-    width: 0;
-    height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-  }
-
-  &.IN .triangle {
-    border-bottom: 12px solid #10b981;
-  }
-
-  &.OUT .triangle {
-    border-top: 12px solid #ef4444;
-  }
-
-  &:hover .triangle {
-    transform: scale(1.2);
-  }
-
-  &:hover .tooltip {
-    opacity: 1;
-    visibility: visible;
-  }
-}
-
-.tooltip {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.85);
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.2s;
-  margin-bottom: 8px;
-  z-index: 10;
-
-  div {
-    line-height: 1.5;
-  }
+  height: 320px;
 }
 </style>

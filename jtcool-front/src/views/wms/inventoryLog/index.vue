@@ -49,11 +49,6 @@
         :groupedData="warehouseGroups"
         :timeUnit="timeUnit"
         @eventClick="showEventDetail" />
-
-      <TimelineChart v-else
-        :events="logList"
-        :timeUnit="timeUnit"
-        @eventClick="showEventDetail" />
     </div>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
@@ -69,7 +64,6 @@ import { groupByProduct, groupByWarehouse, calculateStats } from '@/utils/invent
 import DimensionSelector from '@/components/wms/DimensionSelector.vue'
 import ProductDimensionView from '@/components/wms/ProductDimensionView.vue'
 import WarehouseDimensionView from '@/components/wms/WarehouseDimensionView.vue'
-import TimelineChart from '@/components/wms/TimelineChart.vue'
 
 const { proxy } = getCurrentInstance()
 

@@ -11,17 +11,11 @@
       <h3>按仓库查看</h3>
       <p>查看每个仓库中各产品的流水</p>
     </el-card>
-
-    <el-card class="dimension-card" :class="{active: modelValue === 'time'}" @click="emit('update:modelValue', 'time')">
-      <el-icon :size="32"><Clock /></el-icon>
-      <h3>按时间查看</h3>
-      <p>查看时间轴上的库存变化</p>
-    </el-card>
   </div>
 </template>
 
 <script setup>
-import { Box, OfficeBuilding, Clock } from '@element-plus/icons-vue'
+import { Box, OfficeBuilding } from '@element-plus/icons-vue'
 
 defineProps({
   modelValue: { type: String, default: 'product' }
@@ -33,7 +27,7 @@ const emit = defineEmits(['update:modelValue'])
 <style lang="scss" scoped>
 .dimension-selector {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
