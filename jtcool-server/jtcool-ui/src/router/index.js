@@ -161,6 +161,99 @@ export const dynamicRoutes = [
         meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
       }
     ]
+  },
+  {
+    path: '/oms',
+    component: Layout,
+    redirect: '/oms/order',
+    name: 'Oms',
+    meta: { title: '订单管理', icon: 'shopping' },
+    children: [
+      {
+        path: 'order',
+        component: () => import('@/views/oms/order/index'),
+        name: 'Order',
+        meta: { title: '订单管理' }
+      },
+      {
+        path: 'customer',
+        component: () => import('@/views/oms/customer/index'),
+        name: 'Customer',
+        meta: { title: '客户管理' }
+      },
+      {
+        path: 'finance',
+        component: () => import('@/views/oms/finance/index'),
+        name: 'Finance',
+        meta: { title: '财务管理' }
+      }
+    ]
+  },
+  {
+    path: '/wms',
+    component: Layout,
+    redirect: '/wms/warehouse',
+    name: 'Wms',
+    meta: { title: '仓库管理', icon: 'guide' },
+    children: [
+      {
+        path: 'warehouse',
+        component: () => import('@/views/wms/warehouse/index'),
+        name: 'Warehouse',
+        meta: { title: '仓库管理' }
+      },
+      {
+        path: 'inventory',
+        component: () => import('@/views/wms/inventory/index'),
+        name: 'Inventory',
+        meta: { title: '库存管理' }
+      },
+      {
+        path: 'stockBill',
+        component: () => import('@/views/wms/stockBill/index'),
+        name: 'StockBill',
+        meta: { title: '出入库单' }
+      },
+      {
+        path: 'inventoryLog',
+        component: () => import('@/views/wms/inventoryLog/index'),
+        name: 'InventoryLog',
+        meta: { title: '库存流水' }
+      }
+    ]
+  },
+  {
+    path: '/product',
+    component: Layout,
+    redirect: '/product/product',
+    name: 'Product',
+    meta: { title: '产品档案', icon: 'list' },
+    children: [
+      {
+        path: 'product',
+        component: () => import('@/views/product/product/index'),
+        name: 'ProductInfo',
+        meta: { title: '产品管理' }
+      },
+      {
+        path: 'brand',
+        component: () => import('@/views/product/brand/index'),
+        name: 'Brand',
+        meta: { title: '品牌管理' }
+      },
+      {
+        path: 'supplier',
+        component: () => import('@/views/product/supplier/index'),
+        name: 'Supplier',
+        meta: { title: '供应商管理' }
+      },
+      {
+        path: 'category',
+        component: () => import('@/views/product/category/index'),
+        name: 'Category',
+        meta: { title: '分类管理' }
+      }
+    ]
   }
 ]
 

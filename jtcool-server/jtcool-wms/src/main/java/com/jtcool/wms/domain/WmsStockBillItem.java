@@ -1,14 +1,22 @@
 package com.jtcool.wms.domain;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 
 public class WmsStockBillItem {
     private Long itemId;
     private Long billId;
+
+    @NotNull(message = "产品ID不能为空")
     private Long productId;
+
     private Long areaId;
     private Long locationId;
     private Long shelfId;
+
+    @NotNull(message = "数量不能为空")
+    @Min(value = 1, message = "数量必须大于0")
     private Integer quantity;
     private String delFlag;
     private Date createTime;

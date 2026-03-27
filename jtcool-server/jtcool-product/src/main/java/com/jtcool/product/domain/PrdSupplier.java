@@ -1,9 +1,12 @@
 package com.jtcool.product.domain;
 
 import com.jtcool.common.core.domain.BaseEntity;
+import jakarta.validation.constraints.NotBlank;
 
 public class PrdSupplier extends BaseEntity {
     private Long supplierId;
+
+    @NotBlank(message = "供应商名称不能为空")
     private String supplierName;
     private String supplierCode;
     private String contactPerson;

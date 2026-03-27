@@ -50,8 +50,11 @@ public class DocumentIngestService {
                 document = new ApachePdfBoxDocumentParser().parse(inputStream);
             } else if ("docx".equals(docType)) {
                 document = new ApachePoiDocumentParser().parse(inputStream);
+            } else if ("md".equals(docType)) {
+                String content = new String(fileBytes, java.nio.charset.StandardCharsets.UTF_8);
+                document = Document.from(content);
             } else {
-                throw new IllegalArgumentException("Unsupported file type");
+                throw new IllegalArgumentException("Unsupported file type: " + docType);
             }
         } catch (Exception e) {
             log.error("Parse document failed", e);

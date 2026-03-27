@@ -1,14 +1,22 @@
 package com.jtcool.wms.domain;
 
 import com.jtcool.common.core.domain.BaseEntity;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 import java.util.List;
 
 public class WmsStockBill extends BaseEntity {
     private Long billId;
     private String billNo;
+
+    @NotBlank(message = "单据类型不能为空")
     private String billType;
+
+    @NotNull(message = "单据日期不能为空")
     private Date billDate;
+
+    @NotNull(message = "仓库ID不能为空")
     private Long warehouseId;
     private Long relatedOrderId;
     private Long customerId;

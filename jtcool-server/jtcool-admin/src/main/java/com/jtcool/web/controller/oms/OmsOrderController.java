@@ -1,5 +1,6 @@
 package com.jtcool.web.controller.oms;
 
+import com.jtcool.common.annotation.RepeatSubmit;
 import com.jtcool.common.core.controller.BaseController;
 import com.jtcool.common.core.domain.AjaxResult;
 import com.jtcool.common.core.page.TableDataInfo;
@@ -33,6 +34,7 @@ public class OmsOrderController extends BaseController {
         return success(omsOrderService.selectOmsOrderById(orderId));
     }
 
+    @RepeatSubmit(interval = 5000, message = "请勿重复提交订单")
     @PostMapping
     public AjaxResult add(@RequestBody OmsOrder omsOrder) {
         return toAjax(omsOrderService.insertOmsOrder(omsOrder));
@@ -53,6 +55,7 @@ public class OmsOrderController extends BaseController {
         return toAjax(omsOrderService.updateOrderStatus(orderId, status));
     }
 
+    @RepeatSubmit(interval = 3000, message = "操作进行中，请稍候")
     @PostMapping("/workflow/{orderId}/sales-confirm")
     public AjaxResult confirmBySales(@PathVariable Long orderId) {
         String operator = SecurityUtils.getUsername();
@@ -60,6 +63,7 @@ public class OmsOrderController extends BaseController {
         return success("销售确认成功");
     }
 
+    @RepeatSubmit(interval = 3000, message = "操作进行中，请稍候")
     @PostMapping("/workflow/{orderId}/review")
     public AjaxResult reviewOrder(@PathVariable Long orderId) {
         String operator = SecurityUtils.getUsername();
@@ -67,6 +71,7 @@ public class OmsOrderController extends BaseController {
         return success("订单审核通过");
     }
 
+    @RepeatSubmit(interval = 3000, message = "操作进行中，请稍候")
     @PostMapping("/workflow/{orderId}/warehouse-confirm")
     public AjaxResult confirmByWarehouse(@PathVariable Long orderId) {
         String operator = SecurityUtils.getUsername();
@@ -74,6 +79,7 @@ public class OmsOrderController extends BaseController {
         return success("仓库确认成功");
     }
 
+    @RepeatSubmit(interval = 3000, message = "操作进行中，请稍候")
     @PostMapping("/workflow/{orderId}/register-outbound")
     public AjaxResult registerOutbound(@PathVariable Long orderId) {
         String operator = SecurityUtils.getUsername();
@@ -81,6 +87,7 @@ public class OmsOrderController extends BaseController {
         return success("登记出库成功");
     }
 
+    @RepeatSubmit(interval = 3000, message = "操作进行中，请稍候")
     @PostMapping("/workflow/{orderId}/confirm-shipment")
     public AjaxResult confirmShipment(@PathVariable Long orderId, @RequestParam String trackingNumber) {
         String operator = SecurityUtils.getUsername();

@@ -1,18 +1,27 @@
 package com.jtcool.product.domain;
 
 import com.jtcool.common.core.domain.BaseEntity;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 
 public class PrdProduct extends BaseEntity {
     private Long productId;
     private String productCode;
+
+    @NotBlank(message = "产品名称不能为空")
     private String productName;
+
     private Long categoryId;
     private Long brandId;
     private Long supplierId;
     private String specification;
     private String unit;
+
+    @DecimalMin(value = "0", message = "标准价格不能为负数")
     private BigDecimal standardPrice;
+
+    @DecimalMin(value = "0", message = "成本价格不能为负数")
     private BigDecimal costPrice;
     private Integer minStock;
     private Integer maxStock;

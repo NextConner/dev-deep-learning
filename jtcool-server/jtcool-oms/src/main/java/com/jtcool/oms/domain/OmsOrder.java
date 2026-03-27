@@ -1,6 +1,8 @@
 package com.jtcool.oms.domain;
 
 import com.jtcool.common.core.domain.BaseEntity;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
@@ -8,11 +10,24 @@ import java.util.List;
 public class OmsOrder extends BaseEntity {
     private Long orderId;
     private String orderNo;
+
+    @NotNull(message = "客户ID不能为空")
     private Long customerId;
+
+    @NotNull(message = "订单日期不能为空")
     private Date orderDate;
+
     private Date deliveryDate;
+
+    @NotNull(message = "订单金额不能为空")
+    @DecimalMin(value = "0.01", message = "订单金额必须大于0")
     private BigDecimal totalAmount;
+
+    @DecimalMin(value = "0", message = "折扣金额不能为负数")
     private BigDecimal discountAmount;
+
+    @NotNull(message = "最终金额不能为空")
+    @DecimalMin(value = "0.01", message = "最终金额必须大于0")
     private BigDecimal finalAmount;
     private String orderStatus;
     private Long salesUserId;

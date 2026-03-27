@@ -1,19 +1,34 @@
 package com.jtcool.wms.domain;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 
 public class WmsInventory {
     private Long inventoryId;
+
+    @NotNull(message = "产品ID不能为空")
     private Long productId;
+
     private String productName;
     private Integer warningStock;
+
+    @NotNull(message = "仓库ID不能为空")
     private Long warehouseId;
+
     private String warehouseName;
     private Long areaId;
     private Long locationId;
     private Long shelfId;
+
+    @NotNull(message = "数量不能为空")
+    @Min(value = 0, message = "数量不能为负数")
     private Integer quantity;
+
+    @Min(value = 0, message = "锁定数量不能为负数")
     private Integer lockedQuantity;
+
+    @Min(value = 0, message = "可用数量不能为负数")
     private Integer availableQuantity;
     private Integer version;
     private String delFlag;

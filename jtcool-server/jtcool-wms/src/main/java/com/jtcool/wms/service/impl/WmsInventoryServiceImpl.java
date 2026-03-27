@@ -8,6 +8,7 @@ import com.jtcool.wms.mapper.WmsInventoryMapper;
 import com.jtcool.wms.service.IWmsInventoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -49,7 +50,7 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void deductInventory(Long productId, Long warehouseId, Long areaId, Long locationId, Long shelfId,
                                 Integer quantity, Long billId, String billNo, String billType, Long operatorId) {
         String lockKey = "inventory:" + productId + ":" + warehouseId + ":" + areaId + ":"
@@ -61,7 +62,7 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void addInventory(Long productId, Long warehouseId, Long areaId, Long locationId, Long shelfId,
                              Integer quantity, Long billId, String billNo, String billType, Long operatorId) {
         String lockKey = "inventory:" + productId + ":" + warehouseId + ":" + areaId + ":"

@@ -58,6 +58,10 @@ agent:
     max-rows: 100
     allowed-schemas: [public]
 
+workflow:
+  engine:
+    enabled: ${WORKFLOW_ENGINE_ENABLED:false}
+
 # application.yml
 #langchain4j:
 #  openai:              # 不是 open-ai
