@@ -83,4 +83,50 @@
         </foreach>
     </delete>
 
+    <select id="selectOrderListPaginated" resultMap="OmsOrderResult">
+        <include refid="selectOmsOrderVo"/>
+        <where>
+            del_flag = '0'
+            <if test="order.orderNo != null and order.orderNo != ''">
+                AND order_no LIKE CONCAT('%', #{order.orderNo}, '%')
+            </if>
+            <if test="order.customerId != null">
+                AND customer_id = #{order.customerId}
+            </if>
+            <if test="order.orderStatus != null and order.orderStatus != ''">
+                AND order_status = #{order.orderStatus}
+            </if>
+            <if test="order.params.beginTime != null and order.params.beginTime != ''">
+                AND create_time &gt;= #{order.params.beginTime}
+            </if>
+            <if test="order.params.endTime != null and order.params.endTime != ''">
+                AND create_time &lt;= #{order.params.endTime}
+            </if>
+        </where>
+        ORDER BY order_id
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countOrderList" resultType="long">
+        select count(*) from oms_order
+        <where>
+            del_flag = '0'
+            <if test="orderNo != null and orderNo != ''">
+                AND order_no LIKE CONCAT('%', #{orderNo}, '%')
+            </if>
+            <if test="customerId != null">
+                AND customer_id = #{customerId}
+            </if>
+            <if test="orderStatus != null and orderStatus != ''">
+                AND order_status = #{orderStatus}
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                AND create_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                AND create_time &lt;= #{params.endTime}
+            </if>
+        </where>
+    </select>
+
 </mapper>

@@ -208,4 +208,14 @@ public class OmsOrderServiceImpl implements IOmsOrderService {
     public void confirmReceipt(Long orderId, String operator) {
         transitionStatus(orderId, OrderStatusEnum.CUSTOMER_RECEIVED, operator, "客户签收");
     }
+
+    @Override
+    public List<OmsOrder> selectOrderListPaginated(OmsOrder order, int pageSize, int offset) {
+        return omsOrderMapper.selectOrderListPaginated(order, pageSize, offset);
+    }
+
+    @Override
+    public long countOrderList(OmsOrder order) {
+        return omsOrderMapper.countOrderList(order);
+    }
 }

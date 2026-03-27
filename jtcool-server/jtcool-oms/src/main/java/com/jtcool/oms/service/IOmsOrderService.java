@@ -18,4 +18,8 @@ public interface IOmsOrderService {
     void registerOutbound(Long orderId, String operator);
     void confirmShipment(Long orderId, String operator, String trackingNumber);
     void confirmReceipt(Long orderId, String operator);
+
+    // 分页查询方法
+    List<OmsOrder> selectOrderListPaginated(OmsOrder order, int pageSize, int offset);
+    long countOrderList(OmsOrder order);
 }

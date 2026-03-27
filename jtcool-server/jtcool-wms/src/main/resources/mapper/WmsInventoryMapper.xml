@@ -118,4 +118,28 @@
         where inventory_id = #{inventoryId}
     </update>
 
+    <select id="selectInventoryListPaginated" resultMap="WmsInventoryResult">
+        <include refid="selectWmsInventoryVo"/>
+        <where>
+            i.del_flag = '0'
+            <if test="inventory.productId != null">and i.product_id = #{inventory.productId}</if>
+            <if test="inventory.warehouseId != null">and i.warehouse_id = #{inventory.warehouseId}</if>
+            <if test="inventory.areaId != null">and i.area_id = #{inventory.areaId}</if>
+            <if test="inventory.locationId != null">and i.location_id = #{inventory.locationId}</if>
+        </where>
+        ORDER BY i.inventory_id
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countInventoryList" resultType="long">
+        select count(*) from wms_inventory i
+        <where>
+            i.del_flag = '0'
+            <if test="productId != null">and i.product_id = #{productId}</if>
+            <if test="warehouseId != null">and i.warehouse_id = #{warehouseId}</if>
+            <if test="areaId != null">and i.area_id = #{areaId}</if>
+            <if test="locationId != null">and i.location_id = #{locationId}</if>
+        </where>
+    </select>
+
 </mapper>

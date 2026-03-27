@@ -1,6 +1,11 @@
 package com.jtcool.framework.service;
 
 import com.jtcool.common.domain.ExportStatus;
+import com.jtcool.common.utils.poi.ExcelUtil;
+import com.jtcool.oms.domain.OmsOrder;
+import com.jtcool.oms.service.IOmsOrderService;
+import com.jtcool.wms.domain.WmsInventory;
+import com.jtcool.wms.service.IWmsInventoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +17,7 @@ import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -25,11 +31,19 @@ public class AsyncExportService {
     @Autowired
     private ExportJobService exportJobService;
 
+    @Autowired(required = false)
+    private IOmsOrderService omsOrderService;
+
+    @Autowired(required = false)
+    private IWmsInventoryService wmsInventoryService;
+
     @Value("${jtcool.profile}")
     private String downloadPath;
 
     /** 最多 20 个并发导出 */
     private final Semaphore exportSemaphore = new Semaphore(20);
+
+    private static final int PAGE_SIZE = 10000;
 
     /**
      * 异步执行导出任务
@@ -49,9 +63,8 @@ public class AsyncExportService {
             // 生成文件路径（永久保留）
             String filePath = generateFilePath(jobId, exportType);
 
-            // TODO: 实际的导出逻辑将在 Phase 3 实现
-            // 这里先创建一个占位实现
-            simulateExport(jobId, filePath);
+            // 执行分页导出
+            exportWithPagination(jobId, exportType, queryParams, filePath);
 
             exportJobService.completeJob(jobId, filePath);
             log.info("导出任务完成: jobId={}, filePath={}", jobId, filePath);
@@ -84,17 +97,73 @@ public class AsyncExportService {
     }
 
     /**
-     * 模拟导出过程（Phase 3 将替换为真实实现）
+     * 分页导出核心逻辑
      */
-    private void simulateExport(String jobId, String filePath) throws Exception {
-        // 模拟进度更新
-        for (int i = 0; i <= 100; i += 20) {
-            exportJobService.updateJobProgress(jobId, i, i * 100L);
-            Thread.sleep(500);
+    private void exportWithPagination(String jobId, String exportType, Object queryParams, String filePath) throws Exception {
+        if ("OmsOrder".equals(exportType)) {
+            exportOmsOrders(jobId, filePath);
+        } else if ("WmsInventory".equals(exportType)) {
+            exportWmsInventory(jobId, filePath);
+        } else {
+            throw new IllegalArgumentException("不支持的导出类型: " + exportType);
         }
+    }
 
-        // 创建空文件作为占位
-        File file = new File(filePath);
-        file.createNewFile();
+    private void exportOmsOrders(String jobId, String filePath) throws Exception {
+        OmsOrder query = new OmsOrder();
+        long total = omsOrderService.countOrderList(query);
+
+        ExcelUtil<OmsOrder> util = new ExcelUtil<>(OmsOrder.class);
+        util.initStreamingExport(filePath);
+
+        try {
+            int offset = 0;
+            long processed = 0;
+
+            while (offset < total) {
+                List<OmsOrder> batch = omsOrderService.selectOrderListPaginated(query, PAGE_SIZE, offset);
+                if (batch.isEmpty()) break;
+
+                util.appendBatch(batch);
+                processed += batch.size();
+                offset += PAGE_SIZE;
+
+                int progress = (int) ((processed * 100) / total);
+                exportJobService.updateJobProgress(jobId, progress, processed);
+            }
+
+            util.finalizeExport();
+        } catch (Exception e) {
+            throw e;
+        }
+    }
+
+    private void exportWmsInventory(String jobId, String filePath) throws Exception {
+        WmsInventory query = new WmsInventory();
+        long total = wmsInventoryService.countInventoryList(query);
+
+        ExcelUtil<WmsInventory> util = new ExcelUtil<>(WmsInventory.class);
+        util.initStreamingExport(filePath);
+
+        try {
+            int offset = 0;
+            long processed = 0;
+
+            while (offset < total) {
+                List<WmsInventory> batch = wmsInventoryService.selectInventoryListPaginated(query, PAGE_SIZE, offset);
+                if (batch.isEmpty()) break;
+
+                util.appendBatch(batch);
+                processed += batch.size();
+                offset += PAGE_SIZE;
+
+                int progress = (int) ((processed * 100) / total);
+                exportJobService.updateJobProgress(jobId, progress, processed);
+            }
+
+            util.finalizeExport();
+        } catch (Exception e) {
+            throw e;
+        }
     }
 }

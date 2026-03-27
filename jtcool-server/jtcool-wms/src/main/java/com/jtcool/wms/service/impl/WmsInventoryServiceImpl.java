@@ -143,4 +143,14 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
         log.setOperatorId(operatorId);
         wmsInventoryLogMapper.insertWmsInventoryLog(log);
     }
+
+    @Override
+    public List<WmsInventory> selectInventoryListPaginated(WmsInventory inventory, int pageSize, int offset) {
+        return wmsInventoryMapper.selectInventoryListPaginated(inventory, pageSize, offset);
+    }
+
+    @Override
+    public long countInventoryList(WmsInventory inventory) {
+        return wmsInventoryMapper.countInventoryList(inventory);
+    }
 }
