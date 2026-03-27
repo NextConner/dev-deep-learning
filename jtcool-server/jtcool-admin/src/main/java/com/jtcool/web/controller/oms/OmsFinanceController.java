@@ -1,5 +1,6 @@
 package com.jtcool.web.controller.oms;
 
+import com.jtcool.common.annotation.RepeatSubmit;
 import com.jtcool.common.core.controller.BaseController;
 import com.jtcool.common.core.domain.AjaxResult;
 import com.jtcool.common.core.page.TableDataInfo;
@@ -28,6 +29,7 @@ public class OmsFinanceController extends BaseController {
         return success(omsFinanceService.selectOmsFinanceById(financeId));
     }
 
+    @RepeatSubmit(interval = 5000, message = "请勿重复提交付款")
     @PostMapping("/payment")
     public AjaxResult addPayment(@RequestBody OmsPayment omsPayment) {
         return toAjax(omsFinanceService.addPayment(omsPayment));

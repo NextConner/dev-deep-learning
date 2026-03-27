@@ -1,5 +1,6 @@
 package com.jtcool.web.controller.wms;
 
+import com.jtcool.common.annotation.RepeatSubmit;
 import com.jtcool.common.core.controller.BaseController;
 import com.jtcool.common.core.domain.AjaxResult;
 import com.jtcool.common.core.page.TableDataInfo;
@@ -27,6 +28,7 @@ public class WmsStockBillController extends BaseController {
         return success(wmsStockBillService.selectWmsStockBillById(billId));
     }
 
+    @RepeatSubmit(interval = 5000, message = "请勿重复提交出入库单")
     @PostMapping
     public AjaxResult add(@RequestBody WmsStockBill wmsStockBill) {
         return toAjax(wmsStockBillService.insertWmsStockBill(wmsStockBill));
@@ -42,6 +44,7 @@ public class WmsStockBillController extends BaseController {
         return toAjax(wmsStockBillService.deleteWmsStockBillByIds(billIds));
     }
 
+    @RepeatSubmit(interval = 3000, message = "操作进行中，请稍候")
     @PostMapping("/confirm/{billId}")
     public AjaxResult confirm(@PathVariable Long billId, @RequestParam(required = false) Long operatorId) {
         wmsStockBillService.confirmStockBill(billId, operatorId);
