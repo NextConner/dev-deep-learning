@@ -1,9 +1,12 @@
 package com.jtcool.product.domain;
 
 import com.jtcool.common.core.domain.BaseEntity;
+import jakarta.validation.constraints.NotBlank;
 
 public class PrdBrand extends BaseEntity {
     private Long brandId;
+
+    @NotBlank(message = "品牌名称不能为空")
     private String brandName;
     private String brandCode;
     private String logoUrl;

@@ -9,6 +9,7 @@ import com.jtcool.oms.mapper.OmsPaymentMapper;
 import com.jtcool.oms.service.IOmsFinanceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
@@ -33,7 +34,7 @@ public class OmsFinanceServiceImpl implements IOmsFinanceService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public int createFinanceForOrder(Long orderId, String financeType) {
         OmsOrder order = omsOrderMapper.selectOmsOrderById(orderId);
         OmsFinance finance = new OmsFinance();
@@ -44,7 +45,7 @@ public class OmsFinanceServiceImpl implements IOmsFinanceService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public int addPayment(OmsPayment omsPayment) {
         omsPaymentMapper.insertOmsPayment(omsPayment);
         OmsFinance finance = omsFinanceMapper.selectOmsFinanceById(omsPayment.getFinanceId());
@@ -57,7 +58,7 @@ public class OmsFinanceServiceImpl implements IOmsFinanceService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public int updateInvoice(OmsFinance omsFinance) {
         omsFinance.setInvoiceStatus("ISSUED");
         return omsFinanceMapper.updateOmsFinance(omsFinance);

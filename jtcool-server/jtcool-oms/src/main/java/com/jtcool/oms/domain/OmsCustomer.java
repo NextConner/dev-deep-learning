@@ -1,17 +1,24 @@
 package com.jtcool.oms.domain;
 
 import com.jtcool.common.core.domain.BaseEntity;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 
 public class OmsCustomer extends BaseEntity {
     private Long customerId;
     private String customerCode;
+
+    @NotBlank(message = "客户名称不能为空")
     private String customerName;
+
     private String customerType;
     private String contactPerson;
     private String contactPhone;
     private String contactEmail;
     private String address;
+
+    @DecimalMin(value = "0", message = "信用额度不能为负数")
     private BigDecimal creditLimit;
     private String status;
     private String delFlag;
