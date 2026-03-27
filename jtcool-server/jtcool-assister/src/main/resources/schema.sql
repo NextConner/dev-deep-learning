@@ -95,3 +95,144 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_trace_id ON audit_log(trace_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
+
+-- Workflow Engine Tables (Part 2)
+CREATE TABLE IF NOT EXISTS workflow_definition (
+    id BIGSERIAL PRIMARY KEY,
+    workflow_code VARCHAR(50) UNIQUE NOT NULL,
+    workflow_name VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    version INT DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS workflow_state (
+    id BIGSERIAL PRIMARY KEY,
+    workflow_id BIGINT REFERENCES workflow_definition(id),
+    state_code VARCHAR(50) NOT NULL,
+    state_name VARCHAR(100) NOT NULL,
+    state_type VARCHAR(20) NOT NULL,
+    timeout_hours INT,
+    UNIQUE(workflow_id, state_code)
+);
+
+CREATE TABLE IF NOT EXISTS workflow_transition (
+    id BIGSERIAL PRIMARY KEY,
+    workflow_id BIGINT REFERENCES workflow_definition(id),
+    from_state_id BIGINT REFERENCES workflow_state(id),
+    to_state_id BIGINT REFERENCES workflow_state(id),
+    transition_name VARCHAR(100) NOT NULL,
+    condition_expression VARCHAR(500),
+    required_role VARCHAR(50),
+    action_bean VARCHAR(100),
+    priority INT DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS workflow_instance (
+    id BIGSERIAL PRIMARY KEY,
+    workflow_id BIGINT REFERENCES workflow_definition(id),
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id BIGINT NOT NULL,
+    current_state_id BIGINT REFERENCES workflow_state(id),
+    status VARCHAR(20) NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    UNIQUE(entity_type, entity_id)
+);
+
+CREATE TABLE IF NOT EXISTS workflow_history (
+    id BIGSERIAL PRIMARY KEY,
+    instance_id BIGINT REFERENCES workflow_instance(id),
+    from_state_id BIGINT,
+    to_state_id BIGINT NOT NULL,
+    operator VARCHAR(50) NOT NULL,
+    transition_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    comment TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_instance_entity ON workflow_instance(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_history_instance ON workflow_history(instance_id);
+
+-- Seed ORDER_APPROVAL_V1 workflow
+INSERT INTO workflow_definition (workflow_code, workflow_name, entity_type, version, is_active, created_at)
+VALUES ('ORDER_APPROVAL_V1', '订单审批流程V1', 'OMS_ORDER', 1, true, CURRENT_TIMESTAMP)
+ON CONFLICT (workflow_code) DO NOTHING;
+
+-- Seed workflow states
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'PLACED', '已下单', 'START', 24 FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'SALES_CONFIRMED', '销售确认', 'NORMAL', 48 FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'ORDER_REVIEWED', '订单审核', 'NORMAL', 24 FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'WAREHOUSE_CONFIRMED', '仓库确认', 'NORMAL', 48 FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'OUTBOUND_REGISTERED', '出库登记', 'NORMAL', 24 FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'SHIPMENT_CONFIRMED', '发货确认', 'NORMAL', 72 FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+INSERT INTO workflow_state (workflow_id, state_code, state_name, state_type, timeout_hours)
+SELECT id, 'CUSTOMER_RECEIVED', '客户签收', 'END', NULL FROM workflow_definition WHERE workflow_code = 'ORDER_APPROVAL_V1'
+ON CONFLICT (workflow_id, state_code) DO NOTHING;
+
+-- Seed workflow transitions
+INSERT INTO workflow_transition (workflow_id, from_state_id, to_state_id, transition_name, condition_expression, required_role, priority)
+SELECT
+    wd.id,
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'PLACED'),
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'SALES_CONFIRMED'),
+    '销售确认', NULL, 'ROLE_SALES', 0
+FROM workflow_definition wd WHERE wd.workflow_code = 'ORDER_APPROVAL_V1';
+
+INSERT INTO workflow_transition (workflow_id, from_state_id, to_state_id, transition_name, condition_expression, required_role, priority)
+SELECT
+    wd.id,
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'SALES_CONFIRMED'),
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'ORDER_REVIEWED'),
+    '订单审核', NULL, 'ROLE_REVIEWER', 0
+FROM workflow_definition wd WHERE wd.workflow_code = 'ORDER_APPROVAL_V1';
+
+INSERT INTO workflow_transition (workflow_id, from_state_id, to_state_id, transition_name, condition_expression, required_role, priority)
+SELECT
+    wd.id,
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'ORDER_REVIEWED'),
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'WAREHOUSE_CONFIRMED'),
+    '仓库确认', NULL, 'ROLE_WAREHOUSE', 0
+FROM workflow_definition wd WHERE wd.workflow_code = 'ORDER_APPROVAL_V1';
+
+INSERT INTO workflow_transition (workflow_id, from_state_id, to_state_id, transition_name, condition_expression, required_role, priority)
+SELECT
+    wd.id,
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'WAREHOUSE_CONFIRMED'),
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'OUTBOUND_REGISTERED'),
+    '出库登记', NULL, 'ROLE_WAREHOUSE', 0
+FROM workflow_definition wd WHERE wd.workflow_code = 'ORDER_APPROVAL_V1';
+
+INSERT INTO workflow_transition (workflow_id, from_state_id, to_state_id, transition_name, condition_expression, required_role, priority)
+SELECT
+    wd.id,
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'OUTBOUND_REGISTERED'),
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'SHIPMENT_CONFIRMED'),
+    '发货确认', NULL, 'ROLE_LOGISTICS', 0
+FROM workflow_definition wd WHERE wd.workflow_code = 'ORDER_APPROVAL_V1';
+
+INSERT INTO workflow_transition (workflow_id, from_state_id, to_state_id, transition_name, condition_expression, required_role, priority)
+SELECT
+    wd.id,
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'SHIPMENT_CONFIRMED'),
+    (SELECT id FROM workflow_state WHERE workflow_id = wd.id AND state_code = 'CUSTOMER_RECEIVED'),
+    '客户签收', NULL, NULL, 0
+FROM workflow_definition wd WHERE wd.workflow_code = 'ORDER_APPROVAL_V1';

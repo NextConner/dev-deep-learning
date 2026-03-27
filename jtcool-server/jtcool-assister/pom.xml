@@ -159,6 +159,12 @@
     <!-- Business module dependencies -->
     <dependency>
       <groupId>com.jtcool</groupId>
+      <artifactId>jtcool-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.jtcool</groupId>
       <artifactId>jtcool-oms</artifactId>
       <version>${project.version}</version>
     </dependency>

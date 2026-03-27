@@ -2,6 +2,9 @@ package com.jtcool.oms.service.impl;
 
 import com.jtcool.common.enums.BillTypeEnum;
 import com.jtcool.common.exception.ServiceException;
+import com.jtcool.common.workflow.service.WorkflowEngine;
+import com.jtcool.common.workflow.domain.WorkflowInstance;
+import com.jtcool.common.workflow.domain.WorkflowTransition;
 import com.jtcool.oms.domain.OmsOrder;
 import com.jtcool.oms.domain.OmsOrderFlow;
 import com.jtcool.oms.domain.OmsOrderItem;
@@ -13,7 +16,10 @@ import com.jtcool.oms.service.IOmsOrderService;
 import com.jtcool.wms.domain.WmsStockBill;
 import com.jtcool.wms.domain.WmsStockBillItem;
 import com.jtcool.wms.service.IWmsStockBillService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +29,8 @@ import java.util.List;
 
 @Service
 public class OmsOrderServiceImpl implements IOmsOrderService {
+    private static final Logger log = LoggerFactory.getLogger(OmsOrderServiceImpl.class);
+
     @Autowired
     private OmsOrderMapper omsOrderMapper;
 
@@ -35,6 +43,12 @@ public class OmsOrderServiceImpl implements IOmsOrderService {
     @Autowired
     private IWmsStockBillService wmsStockBillService;
 
+    @Autowired
+    private WorkflowEngine workflowEngine;
+
+    @Value("${workflow.engine.enabled:false}")
+    private boolean workflowEngineEnabled;
+
     @Override
     public List<OmsOrder> selectOmsOrderList(OmsOrder omsOrder) {
         return omsOrderMapper.selectOmsOrderList(omsOrder);
@@ -46,8 +60,22 @@ public class OmsOrderServiceImpl implements IOmsOrderService {
     }
 
     @Override
+    @Transactional
     public int insertOmsOrder(OmsOrder omsOrder) {
-        return omsOrderMapper.insertOmsOrder(omsOrder);
+        int result = omsOrderMapper.insertOmsOrder(omsOrder);
+
+        // Dual-write: Start workflow instance if engine is enabled
+        if (workflowEngineEnabled && result > 0) {
+            try {
+                workflowEngine.startWorkflow("ORDER_APPROVAL_V1", "OMS_ORDER", omsOrder.getOrderId());
+                log.info("Workflow instance started for order: {}", omsOrder.getOrderId());
+            } catch (Exception e) {
+                log.error("Failed to start workflow instance for order: {}", omsOrder.getOrderId(), e);
+                // Don't fail the transaction - workflow is supplementary
+            }
+        }
+
+        return result;
     }
 
     @Override
@@ -80,6 +108,7 @@ public class OmsOrderServiceImpl implements IOmsOrderService {
             throw new ServiceException("无效的状态流转: " + currentStatus.getDescription() + " -> " + targetStatus.getDescription());
         }
 
+        // Old system: Update order status directly
         order.setOrderStatus(targetStatus.getCode());
         updateOmsOrder(order);
 
@@ -91,8 +120,37 @@ public class OmsOrderServiceImpl implements IOmsOrderService {
         flow.setRemark(remark);
         orderFlowService.insertOmsOrderFlow(flow);
 
+        // Dual-write: Update workflow engine if enabled
+        if (workflowEngineEnabled) {
+            try {
+                WorkflowInstance instance = workflowEngine.getWorkflowInstance("OMS_ORDER", orderId);
+                if (instance != null) {
+                    String transitionName = getTransitionName(targetStatus);
+                    workflowEngine.executeTransition(instance.getId(), transitionName, operator);
+                    log.info("Workflow transition executed: {} -> {}", currentStatus.getCode(), targetStatus.getCode());
+                } else {
+                    log.warn("Workflow instance not found for order: {}", orderId);
+                }
+            } catch (Exception e) {
+                log.error("Failed to execute workflow transition for order: {}", orderId, e);
+                // Don't fail the transaction - workflow is supplementary during migration
+            }
+        }
+
         if (targetStatus == OrderStatusEnum.WAREHOUSE_CONFIRMED) {
             createWmsOutboundBill(order);
+        }
+    }
+
+    private String getTransitionName(OrderStatusEnum targetStatus) {
+        switch (targetStatus) {
+            case SALES_CONFIRMED: return "销售确认";
+            case ORDER_REVIEWED: return "订单审核";
+            case WAREHOUSE_CONFIRMED: return "仓库确认";
+            case OUTBOUND_REGISTERED: return "出库登记";
+            case SHIPMENT_CONFIRMED: return "发货确认";
+            case CUSTOMER_RECEIVED: return "客户签收";
+            default: throw new ServiceException("Unknown target status: " + targetStatus);
         }
     }
 

@@ -9,10 +9,15 @@ import com.jtcool.wms.domain.WmsInventory;
 import com.jtcool.wms.service.IWmsInventoryService;
 import com.jtcool.product.domain.PrdProduct;
 import com.jtcool.product.service.IPrdProductService;
+import com.jtcool.common.workflow.service.WorkflowEngine;
+import com.jtcool.common.workflow.domain.WorkflowInstance;
+import com.jtcool.common.workflow.domain.WorkflowTransition;
+import com.jtcool.common.workflow.domain.TransitionResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import java.util.List;
@@ -30,6 +35,10 @@ public class AgentTools {
     private final IWmsInventoryService wmsInventoryService;
     private final IPrdProductService prdProductService;
     private final ObjectMapper objectMapper;
+    private final WorkflowEngine workflowEngine;
+
+    @Value("${workflow.engine.enabled:false}")
+    private boolean workflowEngineEnabled;
 
     public AgentTools(HybridSearchService hybridSearchService,
                       ToolPolicyGuardService toolPolicyGuardService,
@@ -37,7 +46,8 @@ public class AgentTools {
                       IOmsOrderService omsOrderService,
                       IWmsInventoryService wmsInventoryService,
                       IPrdProductService prdProductService,
-                      ObjectMapper objectMapper) {
+                      ObjectMapper objectMapper,
+                      WorkflowEngine workflowEngine) {
         this.hybridSearchService = hybridSearchService;
         this.toolPolicyGuardService = toolPolicyGuardService;
         this.databaseQueryService = databaseQueryService;
@@ -45,6 +55,7 @@ public class AgentTools {
         this.wmsInventoryService = wmsInventoryService;
         this.prdProductService = prdProductService;
         this.objectMapper = objectMapper;
+        this.workflowEngine = workflowEngine;
     }
 
     /**
@@ -117,36 +128,59 @@ public class AgentTools {
         }
     }
 
-    @Tool("推进订单状态。参数：订单ID和目标状态（SALES_CONFIRMED/ORDER_REVIEWED/WAREHOUSE_CONFIRMED/OUTBOUND_REGISTERED/SHIPMENT_CONFIRMED/CUSTOMER_RECEIVED）")
+    @Tool("推进订单状态。参数：订单ID和目标状态（可选，如不指定则推进到下一个可用状态）")
     public String advanceOrderStatus(String orderId, String targetStatus) {
         toolPolicyGuardService.checkToolAccess("advanceOrderStatus");
         try {
             Long id = Long.parseLong(orderId);
             String operator = SecurityContextHolder.getContext().getAuthentication().getName();
 
-            switch (targetStatus) {
-                case "SALES_CONFIRMED":
-                    omsOrderService.confirmBySales(id, operator);
-                    break;
-                case "ORDER_REVIEWED":
-                    omsOrderService.reviewOrder(id, operator);
-                    break;
-                case "WAREHOUSE_CONFIRMED":
-                    omsOrderService.confirmByWarehouse(id, operator);
-                    break;
-                case "OUTBOUND_REGISTERED":
-                    omsOrderService.registerOutbound(id, operator);
-                    break;
-                case "SHIPMENT_CONFIRMED":
-                    omsOrderService.confirmShipment(id, operator, null);
-                    break;
-                case "CUSTOMER_RECEIVED":
-                    omsOrderService.confirmReceipt(id, operator);
-                    break;
-                default:
-                    return "无效的目标状态：" + targetStatus;
+            if (workflowEngineEnabled) {
+                WorkflowInstance instance = workflowEngine.getWorkflowInstance("OMS_ORDER", id);
+                if (instance == null) {
+                    return "订单工作流实例不存在：" + orderId;
+                }
+
+                List<WorkflowTransition> transitions = workflowEngine.getAvailableTransitions(instance.getId(), operator);
+                if (transitions.isEmpty()) {
+                    return "该订单当前状态无法推进";
+                }
+
+                WorkflowTransition transition = transitions.get(0);
+                TransitionResult result = workflowEngine.executeTransition(instance.getId(), transition.getTransitionName(), operator);
+
+                return String.format("订单状态已更新: %s → %s",
+                    result.getOldState().getStateName(),
+                    result.getNewState().getStateName());
+            } else {
+                if (targetStatus == null || targetStatus.isEmpty()) {
+                    return "请指定目标状态";
+                }
+
+                switch (targetStatus) {
+                    case "SALES_CONFIRMED":
+                        omsOrderService.confirmBySales(id, operator);
+                        break;
+                    case "ORDER_REVIEWED":
+                        omsOrderService.reviewOrder(id, operator);
+                        break;
+                    case "WAREHOUSE_CONFIRMED":
+                        omsOrderService.confirmByWarehouse(id, operator);
+                        break;
+                    case "OUTBOUND_REGISTERED":
+                        omsOrderService.registerOutbound(id, operator);
+                        break;
+                    case "SHIPMENT_CONFIRMED":
+                        omsOrderService.confirmShipment(id, operator, null);
+                        break;
+                    case "CUSTOMER_RECEIVED":
+                        omsOrderService.confirmReceipt(id, operator);
+                        break;
+                    default:
+                        return "无效的目标状态：" + targetStatus;
+                }
+                return "订单状态已更新为：" + targetStatus;
             }
-            return "订单状态已更新为：" + targetStatus;
         } catch (Exception e) {
             log.error("推进订单状态失败", e);
             return "推进订单状态失败：" + e.getMessage();
@@ -184,6 +218,40 @@ public class AgentTools {
         } catch (Exception e) {
             log.error("查询商品失败", e);
             return "查询商品失败：" + e.getMessage();
+        }
+    }
+
+    @Tool("查询工作流定义和当前状态。参数：工作流代码（如ORDER_APPROVAL_V1）和实体ID（可选）")
+    public String describeWorkflow(String workflowCode, String entityId) {
+        toolPolicyGuardService.checkToolAccess("describeWorkflow");
+        try {
+            if (!workflowEngineEnabled) {
+                return "工作流引擎未启用";
+            }
+
+            StringBuilder result = new StringBuilder();
+            var workflow = workflowEngine.loadWorkflow(workflowCode);
+            result.append("工作流：").append(workflow.getWorkflowName()).append("\n");
+            result.append("代码：").append(workflow.getWorkflowCode()).append("\n");
+            result.append("版本：").append(workflow.getVersion()).append("\n");
+
+            if (entityId != null && !entityId.isEmpty()) {
+                Long id = Long.parseLong(entityId);
+                WorkflowInstance instance = workflowEngine.getWorkflowInstance(workflow.getEntityType(), id);
+                if (instance != null) {
+                    result.append("\n当前实例状态：").append(instance.getStatus()).append("\n");
+                    List<WorkflowTransition> transitions = workflowEngine.getAvailableTransitions(
+                        instance.getId(),
+                        SecurityContextHolder.getContext().getAuthentication().getName()
+                    );
+                    result.append("可用操作：").append(transitions.size()).append("个\n");
+                }
+            }
+
+            return result.toString();
+        } catch (Exception e) {
+            log.error("查询工作流失败", e);
+            return "查询工作流失败：" + e.getMessage();
         }
     }
 }
