@@ -4,6 +4,8 @@ import com.jtcool.product.domain.PrdProduct;
 import com.jtcool.product.mapper.PrdProductMapper;
 import com.jtcool.product.service.IPrdProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -18,6 +20,7 @@ public class PrdProductServiceImpl implements IPrdProductService {
     }
 
     @Override
+    @Cacheable(value = "products", key = "#productId")
     public PrdProduct selectPrdProductById(Long productId) {
         return prdProductMapper.selectPrdProductById(productId);
     }
@@ -28,11 +31,13 @@ public class PrdProductServiceImpl implements IPrdProductService {
     }
 
     @Override
+    @CacheEvict(value = "products", key = "#prdProduct.productId")
     public int updatePrdProduct(PrdProduct prdProduct) {
         return prdProductMapper.updatePrdProduct(prdProduct);
     }
 
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public int deletePrdProductByIds(Long[] productIds) {
         return prdProductMapper.deletePrdProductByIds(productIds);
     }

@@ -9,6 +9,7 @@ import com.jtcool.oms.domain.OmsOrder;
 import com.jtcool.oms.domain.OmsOrderFlow;
 import com.jtcool.oms.service.IOmsOrderFlowService;
 import com.jtcool.oms.service.IOmsOrderService;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -35,6 +36,7 @@ public class OmsOrderController extends BaseController {
     }
 
     @RepeatSubmit(interval = 5000, message = "请勿重复提交订单")
+    @RateLimiter(name = "orderApi")
     @PostMapping
     public AjaxResult add(@RequestBody OmsOrder omsOrder) {
         return toAjax(omsOrderService.insertOmsOrder(omsOrder));
