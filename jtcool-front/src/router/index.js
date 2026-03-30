@@ -301,6 +301,20 @@ export const dynamicRoutes = [
     ]
   },
   {
+    path: '/statistics',
+    component: Layout,
+    redirect: '/statistics/universal',
+    meta: { title: '统计分析', icon: 'chart' },
+    children: [
+      {
+        path: 'universal',
+        component: () => import('@/views/statistics/universal'),
+        name: 'UniversalStatistics',
+        meta: { title: '万能统计', icon: 'chart' }
+      }
+    ]
+  },
+  {
     path: "/:pathMatch(.*)*",
     component: () => import('@/views/error/404'),
     hidden: true

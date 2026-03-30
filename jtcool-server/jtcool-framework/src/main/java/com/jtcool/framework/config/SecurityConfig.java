@@ -88,9 +88,16 @@ public class SecurityConfig
         return httpSecurity
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())
-            // 禁用HTTP响应标头
+            // 安全响应标头
             .headers((headersCustomizer) -> {
-                headersCustomizer.cacheControl(cache -> cache.disable()).frameOptions(options -> options.sameOrigin());
+                headersCustomizer
+                    .cacheControl(cache -> cache.disable())
+                    .frameOptions(options -> options.deny())
+                    .contentTypeOptions(options -> options.disable())
+                    .xssProtection(xss -> xss.disable())
+                    .httpStrictTransportSecurity(hsts -> hsts
+                        .includeSubDomains(true)
+                        .maxAgeInSeconds(31536000));
             })
             // 认证失败处理类
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))

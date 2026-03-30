@@ -16,4 +16,8 @@ public interface IWmsInventoryService {
      * 增加库存
      */
     void addInventory(Long productId, Long warehouseId, Long areaId, Long locationId, Long shelfId, Integer quantity, Long billId, String billNo, String billType, Long operatorId);
+
+    // 分页查询方法
+    List<WmsInventory> selectInventoryListPaginated(WmsInventory inventory, int pageSize, int offset);
+    long countInventoryList(WmsInventory inventory);
 }

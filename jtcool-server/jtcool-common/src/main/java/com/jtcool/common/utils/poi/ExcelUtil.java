@@ -1932,7 +1932,7 @@ public class ExcelUtil<T>
 
     /**
      * 获取对象的子列表方法
-     * 
+     *
      * @param name 名称
      * @param pojoClass 类对象
      * @return 子列表方法
@@ -1952,5 +1952,64 @@ public class ExcelUtil<T>
             log.error("获取对象异常{}", e.getMessage());
         }
         return method;
+    }
+
+    // ==================== 流式导出方法 ====================
+
+    private FileOutputStream fileOutputStream;
+    private int sheetIndex = 0;
+
+    /**
+     * 初始化流式导出
+     */
+    public void initStreamingExport(String filePath) throws IOException
+    {
+        this.fileOutputStream = new FileOutputStream(filePath);
+        this.wb = new SXSSFWorkbook(500);
+        this.sheet = wb.createSheet(sheetName);
+        this.styles = createStyles(wb);
+        createTitle();
+        createSubHead();
+    }
+
+    /**
+     * 追加批次数据
+     */
+    public void appendBatch(List<T> batch) throws Exception
+    {
+        for (T item : batch)
+        {
+            if (rownum >= sheetSize)
+            {
+                sheet = wb.createSheet(sheetName + (++sheetIndex));
+                rownum = 0;
+                createTitle();
+                createSubHead();
+            }
+
+            Row row = sheet.createRow(rownum++);
+            fillExcelData(row, item);
+        }
+
+        if (wb instanceof SXSSFWorkbook)
+        {
+            ((SXSSFWorkbook) wb).flushRows(100);
+        }
+    }
+
+    /**
+     * 完成导出
+     */
+    public void finalizeExport() throws IOException
+    {
+        try
+        {
+            wb.write(fileOutputStream);
+        }
+        finally
+        {
+            IOUtils.closeQuietly(wb);
+            IOUtils.closeQuietly(fileOutputStream);
+        }
     }
 }

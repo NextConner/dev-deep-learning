@@ -7,6 +7,8 @@ import com.jtcool.wms.mapper.WmsInventoryLogMapper;
 import com.jtcool.wms.mapper.WmsInventoryMapper;
 import com.jtcool.wms.service.IWmsInventoryService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
     }
 
     @Override
+    @Cacheable(value = "inventory", key = "#inventoryId")
     public WmsInventory selectWmsInventoryById(Long inventoryId) {
         return wmsInventoryMapper.selectWmsInventoryById(inventoryId);
     }
@@ -45,12 +48,14 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
     }
 
     @Override
+    @CacheEvict(value = "inventory", allEntries = true)
     public int updateWmsInventory(WmsInventory wmsInventory) {
         return wmsInventoryMapper.updateWmsInventory(wmsInventory);
     }
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    @CacheEvict(value = "inventory", allEntries = true)
     public void deductInventory(Long productId, Long warehouseId, Long areaId, Long locationId, Long shelfId,
                                 Integer quantity, Long billId, String billNo, String billType, Long operatorId) {
         String lockKey = "inventory:" + productId + ":" + warehouseId + ":" + areaId + ":"
@@ -63,6 +68,7 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    @CacheEvict(value = "inventory", allEntries = true)
     public void addInventory(Long productId, Long warehouseId, Long areaId, Long locationId, Long shelfId,
                              Integer quantity, Long billId, String billNo, String billType, Long operatorId) {
         String lockKey = "inventory:" + productId + ":" + warehouseId + ":" + areaId + ":"
@@ -136,5 +142,15 @@ public class WmsInventoryServiceImpl implements IWmsInventoryService {
         log.setAfterQuantity(afterQty);
         log.setOperatorId(operatorId);
         wmsInventoryLogMapper.insertWmsInventoryLog(log);
+    }
+
+    @Override
+    public List<WmsInventory> selectInventoryListPaginated(WmsInventory inventory, int pageSize, int offset) {
+        return wmsInventoryMapper.selectInventoryListPaginated(inventory, pageSize, offset);
+    }
+
+    @Override
+    public long countInventoryList(WmsInventory inventory) {
+        return wmsInventoryMapper.countInventoryList(inventory);
     }
 }
